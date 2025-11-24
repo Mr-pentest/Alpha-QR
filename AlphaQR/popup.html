@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: Arial;
+      width: 260px;
+      padding: 15px;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+    }
+    .start { background: #1e88e5; color: white; }
+    .stop { background: #e53935; color: white; }
+    img.icon { width: 20px; height: 20px; }
+    
+    .statusBox {
+      margin-top: 15px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #statusIcon { width: 28px; }
+  </style>
+</head>
+
+<body>
+
+<h3>Alpha QR</h3>
+
+<button class="btn start" id="startBtn">Start Scan</button>
+
+<button class="btn stop" id="stopBtn">Stop Scan</button>
+
+<div class="statusBox">
+  <img id="statusIcon" src="icons/AlphaQR.png">
+  <div>
+    <div><b>Status:</b> <span id="statusText">Stopped</span></div>
+    <div><b>Tab:</b> <span id="tabId">-</span></div>
+  </div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

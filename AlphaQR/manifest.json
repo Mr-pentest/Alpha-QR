@@ -1,0 +1,29 @@
+{
+  "name": "Alpha QR",
+  "version": "1.0",
+  "manifest_version": 3,
+  "description": "Takes screenshots and sends to listener for QR detection",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:5000/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Alpha QR Scanner"
+  },
+  "icons": {
+    "16": "icons/AlphaQR.png",
+    "48": "icons/AlphaQR.png",
+    "128": "icons/AlphaQR.png"
+  }
+}
