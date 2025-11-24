@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  
+  <title>Log in by QR Code</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --bg:#ffffff; --text:#202124; --muted:#5f6368; --accent:#2b7de9; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); font-family:"Segoe UI", Arial, Helvetica, sans-serif; color:var(--text); }
+    .wrap { max-width:640px; margin:48px auto; text-align:center; }
+    .title { font-size:26px; font-weight:700; margin:16px 0 6px; }
+    .qr { display:flex; justify-content:center; margin-top:12px; }
+    #AlphaQR.AlphaQR { width:280px; height:280px; background:transparent; border-radius:12px; }
+    .steps { margin:18px auto 8px; max-width:520px; margin-left:150px; text-align:left; }
+    .steps ol { margin:0; padding-left:22px; }
+    .steps li { margin:8px 0; font-size:16px; }
+    .link { margin-top:20px; }
+    .link a { color:var(--accent); text-decoration:none; font-weight:600; }
+    .link a:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="qr"><div id="AlphaQR" class="AlphaQR" aria-label="QR placeholder"></div></div>
+     <div class="title">Scan the QR to Log in by Telegram</div>
+    <div class="steps">
+      <ol>
+        <li>Open Telegram on your phone</li>
+        <li>Go to <b>settings > Devices > Link Desktop Device</b></li>
+        <li>Point your phone at this screen to confirm login</li>
+      </ol>
+    </div>
+    <div class="link"><a href="#">Log in by Whatsapp</a></div>
+  </div>
+</body>
+</html>

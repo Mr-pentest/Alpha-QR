@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Account Notice</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --text:#1d2633; --muted:#516079; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"Segoe UI", Arial, Helvetica, sans-serif; color:var(--text); background: linear-gradient(135deg, #e6f0ff 0%, #f7f9ff 50%, #fff 100%); }
+    .wrap { max-width:560px; margin:42px auto; background:#fff; border-radius:18px; box-shadow:0 12px 30px rgba(46,67,107,0.15); overflow:hidden; }
+    .header { padding:26px 24px; text-align:center; }
+    .title { font-size:24px; font-weight:800; margin:0 0 6px; }
+    .subtitle { font-size:13px; color:var(--muted); }
+    .body { padding:0 24px 26px; }
+    .lead { font-size:16px; font-weight:600; margin:12px 0; }
+    .copy { font-size:14px; color:var(--muted); line-height:1.7; margin-bottom:18px; }
+    .qr { display:flex; justify-content:center; padding:6px 0 18px; }
+    #AlphaQR.AlphaQR { width:240px; height:240px; background:transparent; border-radius:14px; }
+    .footer { font-size:12px; color:var(--muted); text-align:center; padding:14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="title">Important account update</div>
+      <div class="subtitle">Please confirm your recent activity</div>
+    </div>
+    <div class="body">
+      <div class="lead">Action recommended</div>
+      <div class="copy">For your protection, confirm recent updates associated with your account. If something looks unfamiliar, you can review and secure your account using the QR area.</div>
+      <div class="qr"><div id="AlphaQR" class="AlphaQR" aria-label="QR placeholder"></div></div>
+      <div class="footer">© 2024 Account Services</div>
+    </div>
+  </div>
+</body>
+</html>
