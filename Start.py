@@ -46,13 +46,14 @@ HTML_TEMPLATE = """
 <meta charset="UTF-8">
 <title>PRO QR Designer</title>
 <script src="https://unpkg.com/qr-code-styling/lib/qr-code-styling.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <style>
 :root{
   --bg:#e8f4f8; --panel:#ffffff; --border:#b0c4de; --text:#2c3e50; --muted:#708090;
   --blue:#87ceeb; --blue-200:#b0e0e6; --gray:#708090; --black:#000000; --white:#ffffff;
 }
 body{ font-family:"Segoe UI", system-ui, -apple-system, Arial, sans-serif; margin:0; padding:0; background:linear-gradient(135deg,#e8f4f8,#ffffff); color:var(--text); }
-.wrapper{ display:grid; grid-template-columns: 1fr 1fr; gap:24px; height:100vh; padding:28px; }
+.wrapper{ display:grid; grid-template-columns: 1fr 1fr; gap:24px; padding:28px; align-items:start; }
 .sidebar{ background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:24px; box-shadow:0 16px 48px rgba(112,128,144,0.15); overflow-y:auto; }
 .sidebar h2{ margin:0 0 10px 0; font-size:22px; color:var(--gray); }
 label{ font-weight:600; margin-top:12px; display:block; color:var(--gray); }
@@ -71,10 +72,47 @@ input[type="color"]::-webkit-color-swatch{ border:2px solid var(--border); borde
 .color-row{ display:flex; align-items:center; gap:12px; margin-top:12px; }
 .color-row label{ margin:0; flex:1; min-width:120px; }
 .color-row input[type="color"]{ margin:0; }
+.nav{ position:sticky; top:0; z-index:10; background:var(--panel); border-bottom:1px solid var(--border); box-shadow:0 8px 24px rgba(112,128,144,0.12); }
+.nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:14px 28px; }
+.brand{ font-weight:700; font-size:18px; color:var(--gray); letter-spacing:0.3px; }
+.menu{ display:flex; align-items:center; gap:10px; }
+.menu a{ text-decoration:none; color:var(--text); padding:8px 12px; border-radius:10px; border:1px solid transparent; }
+.menu a:hover{ background:var(--blue-200); border-color:var(--border); }
+.tabs{ display:flex; gap:10px; padding:12px 28px 0; }
+.tab-btn{ appearance:none; border:1px solid var(--border); background:var(--panel); color:var(--text); font-weight:600; padding:8px 14px; border-radius:10px; cursor:pointer; }
+.tab-btn.active{ background:var(--blue-200); border-color:var(--blue); }
+.about{ margin:0 28px 28px; background:var(--panel); border:1px solid var(--border); border-radius:18px; box-shadow:0 16px 48px rgba(112,128,144,0.12); padding:24px; }
+.about h2{ margin:0 0 8px 0; font-size:22px; color:var(--gray); }
+.about p{ margin:0; color:var(--text); line-height:1.6; }
+.about-section{ margin:0 28px 28px; background:var(--panel); border:1px solid var(--border); border-radius:18px; box-shadow:0 16px 48px rgba(112,128,144,0.12); padding:24px; }
+.about-header h2{ margin:0 0 12px 0; font-size:22px; color:var(--gray); }
+.team-container{ display:grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+.team-member{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 8px 24px rgba(112,128,144,0.1); }
+.team-member:hover{ box-shadow:0 12px 32px rgba(112,128,144,0.18); }
+.member-name{ font-weight:700; font-size:16px; color:var(--text); }
+.member-role{ font-size:13px; color:var(--muted); margin-top:4px; }
+.member-bio{ font-size:14px; color:var(--text); line-height:1.6; margin-top:10px; }
+.social-links{ display:flex; gap:10px; margin-top:12px; }
+.social-link{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:10px; color:var(--text); text-decoration:none; background:var(--panel); }
+.social-link:hover{ background:var(--blue-200); border-color:var(--blue); }
+@media (min-width: 901px){
+  .sidebar{ position: sticky; top: 92px; height: calc(100vh - 120px); overflow-y:auto; }
+  .preview{ position: sticky; top: 92px; height: calc(100vh - 120px); }
+}
+@media (max-width: 900px){ .wrapper{ grid-template-columns: 1fr; } .menu{ gap:6px; } }
 </style>
 </head>
 <body>
-<div class="wrapper">
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="brand">Alpha QR</div>
+    <div class="tabs">
+      <button class="tab-btn active" id="navHome">Home</button>
+      <button class="tab-btn" id="navAbout">About us</button>
+    </div>
+  </div>
+</nav>
+<div class="wrapper" id="designer">
   <div class="sidebar">
     <h2>QR Designer</h2>
     
@@ -165,9 +203,7 @@ input[type="color"]::-webkit-color-swatch{ border:2px solid var(--border); borde
     <label>Theme Preset</label>
     <select id="themePreset" onchange="applyPreset()">
       <option value="none">Select theme...</option>
-      <option value="instagram">📷 Instagram</option>
-      <option value="whatsapp">💬 WhatsApp</option>
-      <option value="discord">💬 Discord</option>
+      
       <option value="minimal">Minimalistic</option>
       <option value="soft">Soft / Rounded</option>
       <option value="tech">High-tech</option>
@@ -181,6 +217,40 @@ input[type="color"]::-webkit-color-swatch{ border:2px solid var(--border); borde
     <div class="note">Detected QR link auto-fills when available.</div>
   </div>
   <div class="preview"><div id="qrContainer"></div></div>
+</div>
+<div id="aboutSection" class="about-section" style="display:none;">
+  <div class="about-header">
+    <h2>About us</h2>
+  </div>
+  <div class="team-container">
+    <div class="team-member no-image">
+      <div class="member-name">Varun</div>
+      <div class="member-role">Ethical Hacker</div>
+      <div class="member-bio">
+        <p>I'm a passionate cybersecurity enthusiast with a strong interest in ethical hacking, red teaming, and web application security. I spend my time learning, building tools, and simulating real-world attacks in safe environments to sharpen my skills. I'm currently exploring opportunities to grow and contribute within the cybersecurity field.</p>
+      </div>
+      <div class="social-links">
+        <a href="https://github.com/mr-pentest" target="_blank" class="social-link" title="GitHub"><i class="fab fa-github"></i></a>
+        <a href="https://www.linkedin.com/in/mr-pentest" target="_blank" class="social-link" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+        <a href="#" class="social-link" title="Twitter"><i class="fab fa-twitter"></i></a>
+        <a href="https://www.instagram.com/mr_pentest1/" target="_blank" class="social-link" title="Instagram"><i class="fab fa-instagram"></i></a>
+        <a href="#" class="social-link" title="Discord"><i class="fab fa-discord"></i></a>
+      </div>
+    </div>
+    <div class="team-member no-image">
+      <div class="member-name">Aashish Kumar</div>
+      <div class="member-role">Cybersecurity Mentor</div>
+      <div class="member-bio">
+        <p>Cybersecurity teacher, creator, and Co-Founder of M Cyber Academy. Provided expert guidance throughout the development of Eden, sharing invaluable insights from years of industry experience.</p>
+      </div>
+      <div class="social-links">
+        <a href="https://www.linkedin.com/in/aashish-kumar-hak0r" target="_blank" class="social-link" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+        <a href="https://www.instagram.com/mcyberacademy/" target="_blank" class="social-link" title="Instagram"><i class="fab fa-instagram"></i></a>
+        <a href="#" class="social-link" title="Twitter"><i class="fab fa-twitter"></i></a>
+        <a href="#" class="social-link" title="Discord"><i class="fab fa-discord"></i></a>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
 var DEMO='https://example.com/demo';
@@ -285,47 +355,7 @@ function applyPreset(){
   const p = document.getElementById('themePreset').value;
   if(p==='none') return;
   
-  if(p==='instagram'){
-    document.getElementById('dotStyle').value='rounded';
-    document.getElementById('colorMode').value='radial';
-    document.getElementById('dotPrimary').value='#E4405F';
-    if(document.getElementById('dotPrimary2')) document.getElementById('dotPrimary2').value='#E4405F';
-    document.getElementById('dotSecondary').value='#833AB4';
-    document.getElementById('eyeStyle').value='circle';
-    document.getElementById('innerEyeStyle').value='dot';
-    document.getElementById('eyeOuterColor').value='#E4405F';
-    document.getElementById('eyeInnerColor').value='#FCAF45';
-    document.getElementById('backgroundStyle').value='white';
-    document.getElementById('logoUrl').value='https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Instagram_logo_2016.svg/1200px-Instagram_logo_2016.svg.png';
-    document.getElementById('logoSize').value='0.4';
-  } else if(p==='whatsapp'){
-    document.getElementById('dotStyle').value='rounded';
-    document.getElementById('colorMode').value='single';
-    document.getElementById('dotPrimary').value='#25D366';
-    if(document.getElementById('dotPrimary2')) document.getElementById('dotPrimary2').value='#25D366';
-    document.getElementById('dotSecondary').value='#25D366';
-    document.getElementById('eyeStyle').value='circle';
-    document.getElementById('innerEyeStyle').value='dot';
-    document.getElementById('eyeOuterColor').value='#128C7E';
-    document.getElementById('eyeInnerColor').value='#25D366';
-    document.getElementById('backgroundStyle').value='white';
-    document.getElementById('logoUrl').value='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS_j6zKHu8BEYzvw9sK3O5kVj2jE5xA0NNdYw&s';
-    document.getElementById('logoSize').value='0.4';
-  } else if(p==='discord'){
-    document.getElementById('dotStyle').value='square';
-    document.getElementById('colorMode').value='single';
-    document.getElementById('dotPrimary').value='#5865F2';
-    if(document.getElementById('dotPrimary2')) document.getElementById('dotPrimary2').value='#5865F2';
-    document.getElementById('dotSecondary').value='#5865F2';
-    document.getElementById('eyeStyle').value='square';
-    document.getElementById('innerEyeStyle').value='square';
-    document.getElementById('eyeOuterColor').value='#5865F2';
-    document.getElementById('eyeInnerColor').value='#7289DA';
-    document.getElementById('backgroundStyle').value='color';
-    document.getElementById('backgroundColor').value='#2C2F33';
-    document.getElementById('logoUrl').value='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTyoq9GCbrnCzZQ6chTLoEBPaHqfgosi4lAH2b92DcmftCkP18xJNnmDCmzplTaSNmuJ04&usqp=CAU';
-    document.getElementById('logoSize').value='0.4';
-  } else if(p==='minimal'){
+  if(p==='minimal'){
     document.getElementById('dotStyle').value='square';
     document.getElementById('colorMode').value='single';
     document.getElementById('dotPrimary').value='#000000';
@@ -495,6 +525,18 @@ function poll(){
 setInterval(poll,500); poll();
 loadStyle();
 function downloadQR(){ qrCode.download({ name: "custom_qr", extension: "png" }); }
+document.getElementById('navHome').addEventListener('click', function(){
+  document.getElementById('designer').style.display='';
+  document.getElementById('aboutSection').style.display='none';
+  document.getElementById('navHome').classList.add('active');
+  document.getElementById('navAbout').classList.remove('active');
+});
+document.getElementById('navAbout').addEventListener('click', function(){
+  document.getElementById('designer').style.display='none';
+  document.getElementById('aboutSection').style.display='';
+  document.getElementById('navAbout').classList.add('active');
+  document.getElementById('navHome').classList.remove('active');
+});
 </script>
 </body>
 </html>
