@@ -18,7 +18,7 @@ function updateUI(state, tabId) {
   const icon = document.getElementById("statusIcon");
   const text = document.getElementById("statusText");
 
-  icon.src = "icons/AlphaQR.png";
+  icon.src = "Icons/AlphaQR.png";
   text.innerText = state === "running" ? "Running" : "Stopped";
 
   document.getElementById("tabId").innerText = tabId;
