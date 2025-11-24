@@ -33,8 +33,7 @@ style_options = {
     "logoUrl": "",
     "logoSize": 0.35,
     "logoMargin": 8,
-    "hideBgDots": False,
-    "themePreset": "minimal"
+    "hideBgDots": False
 }
 
 DEMO_LINK = "https://example.com/demo"
@@ -200,19 +199,6 @@ input[type="color"]::-webkit-color-swatch{ border:2px solid var(--border); borde
       </div>
     </div>
     <label><input type="checkbox" id="hideBgDots"> Hide dots under logo</label>
-    <label>Theme Preset</label>
-    <select id="themePreset" onchange="applyPreset()">
-      <option value="none">Select theme...</option>
-      
-      <option value="minimal">Minimalistic</option>
-      <option value="soft">Soft / Rounded</option>
-      <option value="tech">High-tech</option>
-      <option value="cartoon">Cartoon</option>
-      <option value="ocean">Ocean Blue</option>
-      <option value="sunset">Sunset</option>
-      <option value="forest">Forest Green</option>
-      <option value="royal">Royal Purple</option>
-    </select>
     <button class="button" onclick="downloadQR()">Download PNG</button>
     <div class="note">Detected QR link auto-fills when available.</div>
   </div>
@@ -351,93 +337,6 @@ document.getElementById("backgroundColor").addEventListener("input", applyUI);
 document.getElementById("logoSize").addEventListener("input", applyUI);
 document.getElementById("logoMargin").addEventListener("input", applyUI);
 document.getElementById("hideBgDots").addEventListener("input", applyUI);
-function applyPreset(){
-  const p = document.getElementById('themePreset').value;
-  if(p==='none') return;
-  
-  if(p==='minimal'){
-    document.getElementById('dotStyle').value='square';
-    document.getElementById('colorMode').value='single';
-    document.getElementById('dotPrimary').value='#000000';
-    document.getElementById('backgroundStyle').value='white';
-    document.getElementById('eyeStyle').value='square';
-    document.getElementById('innerEyeStyle').value='square';
-    document.getElementById('eyeOuterColor').value='#000000';
-    document.getElementById('eyeInnerColor').value='#000000';
-  } else if(p==='soft'){
-    document.getElementById('dotStyle').value='rounded';
-    document.getElementById('colorMode').value='linear';
-    document.getElementById('dotPrimary').value='#87ceeb';
-    document.getElementById('dotSecondary').value='#b0e0e6';
-    document.getElementById('eyeStyle').value='circle';
-    document.getElementById('innerEyeStyle').value='dot';
-    document.getElementById('eyeOuterColor').value='#87ceeb';
-    document.getElementById('eyeInnerColor').value='#b0e0e6';
-  } else if(p==='tech'){
-    document.getElementById('dotStyle').value='classy';
-    document.getElementById('colorMode').value='linear';
-    document.getElementById('dotPrimary').value='#708090';
-    document.getElementById('dotSecondary').value='#87ceeb';
-    document.getElementById('eyeStyle').value='square';
-    document.getElementById('innerEyeStyle').value='square';
-    document.getElementById('eyeOuterColor').value='#708090';
-    document.getElementById('eyeInnerColor').value='#87ceeb';
-  } else if(p==='cartoon'){
-    document.getElementById('dotStyle').value='extra-rounded';
-    document.getElementById('colorMode').value='radial';
-    document.getElementById('dotPrimary').value='#000000';
-    document.getElementById('dotSecondary').value='#87ceeb';
-    document.getElementById('eyeStyle').value='circle';
-    document.getElementById('innerEyeStyle').value='dot';
-    document.getElementById('eyeOuterColor').value='#000000';
-    document.getElementById('eyeInnerColor').value='#87ceeb';
-  } else if(p==='ocean'){
-    document.getElementById('dotStyle').value='rounded';
-    document.getElementById('colorMode').value='linear';
-    document.getElementById('dotPrimary').value='#00b4d8';
-    document.getElementById('dotSecondary').value='#0077b6';
-    document.getElementById('eyeStyle').value='circle';
-    document.getElementById('innerEyeStyle').value='dot';
-    document.getElementById('eyeOuterColor').value='#00b4d8';
-    document.getElementById('eyeInnerColor').value='#0077b6';
-    document.getElementById('backgroundStyle').value='color';
-    document.getElementById('backgroundColor').value='#caf0f8';
-  } else if(p==='sunset'){
-    document.getElementById('dotStyle').value='rounded';
-    document.getElementById('colorMode').value='radial';
-    document.getElementById('dotPrimary').value='#ff6b6b';
-    document.getElementById('dotSecondary').value='#ffd93d';
-    document.getElementById('eyeStyle').value='circle';
-    document.getElementById('innerEyeStyle').value='dot';
-    document.getElementById('eyeOuterColor').value='#ff6b6b';
-    document.getElementById('eyeInnerColor').value='#ffd93d';
-    document.getElementById('backgroundStyle').value='color';
-    document.getElementById('backgroundColor').value='#ffeaa7';
-  } else if(p==='forest'){
-    document.getElementById('dotStyle').value='rounded';
-    document.getElementById('colorMode').value='linear';
-    document.getElementById('dotPrimary').value='#00b894';
-    document.getElementById('dotSecondary').value='#55efc4';
-    document.getElementById('eyeStyle').value='circle';
-    document.getElementById('innerEyeStyle').value='dot';
-    document.getElementById('eyeOuterColor').value='#00b894';
-    document.getElementById('eyeInnerColor').value='#55efc4';
-    document.getElementById('backgroundStyle').value='color';
-    document.getElementById('backgroundColor').value='#d5f4e6';
-  } else if(p==='royal'){
-    document.getElementById('dotStyle').value='rounded';
-    document.getElementById('colorMode').value='linear';
-    document.getElementById('dotPrimary').value='#6c5ce7';
-    document.getElementById('dotSecondary').value='#a29bfe';
-    document.getElementById('eyeStyle').value='circle';
-    document.getElementById('innerEyeStyle').value='dot';
-    document.getElementById('eyeOuterColor').value='#6c5ce7';
-    document.getElementById('eyeInnerColor').value='#a29bfe';
-    document.getElementById('backgroundStyle').value='color';
-    document.getElementById('backgroundColor').value='#f8f9fa';
-  }
-  applyUI(); pushStyle();
-}
 function pushStyle(){
   const payload = {
     dotStyle: document.getElementById("dotStyle").value,
@@ -455,8 +354,7 @@ function pushStyle(){
     logoUrl: document.getElementById("logoUrl").value,
     logoSize: Number(document.getElementById("logoSize").value),
     logoMargin: Number(document.getElementById("logoMargin").value),
-    hideBgDots: document.getElementById("hideBgDots").checked,
-    themePreset: document.getElementById("themePreset").value
+    hideBgDots: document.getElementById("hideBgDots").checked
   };
   fetch('/api/style', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 }
@@ -487,7 +385,6 @@ function loadStyle(){
       document.getElementById('logoSize').value = s.logoSize || 0.35;
       document.getElementById('logoMargin').value = s.logoMargin || 8;
       document.getElementById('hideBgDots').checked = !!s.hideBgDots;
-      document.getElementById('themePreset').value = s.themePreset || 'minimal';
       applyUI();
     }
   }).catch(function(){});
@@ -589,7 +486,7 @@ def style_api():
             "eyeOuterColor","eyeInnerColor",
             "colorMode","gradientType","dotPrimary","dotSecondary",
             "backgroundStyle","backgroundColor","logoUrl","logoSize",
-            "logoMargin","hideBgDots","themePreset"
+            "logoMargin","hideBgDots"
         ]:
             if k in data:
                 style_options[k] = data[k]
