@@ -1272,8 +1272,11 @@ def main():
     global CURRENT_URL
     
     # 1. Host Selection
-    # Default to Ngrok as requested
-    choice = '2'
+    print(f"{Fore.CYAN}Select Hosting Option:{Style.RESET_ALL}")
+    print("1. Localhost (127.0.0.1:5000)")
+    print("2. Ngrok (Public URL)")
+    
+    choice = input(f"{Fore.GREEN}Enter choice (1-2): {Style.RESET_ALL}").strip()
     
     if choice == '2':
         url = start_ngrok_tunnel()
