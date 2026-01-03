@@ -1,81 +1,21 @@
-USE-ONLY — NO MODIFICATION / NO RE-UPLOAD LICENSE
-Version 1.0 — 2025-11-24
+MIT License
 
-Copyright (c) 2025 Varun
+Copyright (c) 2026 Varun
 
-Permission is hereby granted, free of charge, to any person or legal entity
-("Licensee") to use, execute, and operate the Software (as defined below)
-for any lawful purpose, including commercial use, subject to the terms and
-conditions set forth in this License.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Definitions
------------
-"Software" means the original work of authorship provided by the Licensor,
-including source code, object code, binaries, documentation, and resources,
-as delivered by the Licensor.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-"Use" or "Using" means running, executing, interacting with, or otherwise
-operating the Software as provided (including within other systems),
-without creating a modified version of the Software.
-
-Permitted Rights
-----------------
-1. The Licensee may use, run, and operate the Software in unmodified form.
-2. The Licensee may distribute unmodified compiled binaries or executable
-   forms of the Software only if accompanied by:
-   a) a copy of this License, and
-   b) clear attribution to the Licensor (Varun).
-
-Restrictions (No-Modification / No-Reupload)
---------------------------------------------
-1. The Licensee MAY NOT modify, adapt, translate, port, patch, alter, or
-   create any Derivative Works of the Software in any form.
-2. The Licensee MAY NOT upload, publish, mirror, fork, republish, or place
-   the Software (including any modified versions, partial copies, or source
-   code) into any public repository, hosting site, package registry, or
-   publicly accessible archive (including but not limited to GitHub, GitLab,
-   Bitbucket, npm, PyPI, etc.) without prior written permission from Varun.
-3. The Licensee MAY NOT reverse-engineer, decompile, disassemble, or attempt
-   to derive the source code from any object or binary form of the Software,
-   unless explicitly allowed by applicable law.
-
-Attribution
------------
-If unmodified binaries are distributed, the Licensee must include the
-following statement:
-"Copyright (c) 2025 Varun. Used under USE-ONLY — NO MODIFICATION / NO RE-UPLOAD LICENSE."
-
-No Sublicensing
----------------
-The Licensee may not grant sublicenses or transfer rights granted by this
-License to any third party.
-
-Termination
------------
-Any violation of the terms of this License automatically terminates all
-rights granted to the Licensee under this License. Upon termination, the
-Licensee must cease all use and delete all copies of the Software.
-
-Disclaimer of Warranty
-----------------------
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
-
-Limitation of Liability
------------------------
-IN NO EVENT SHALL THE LICENSOR (VARUN) BE LIABLE FOR ANY DAMAGES, DIRECT OR
-INDIRECT, ARISING OUT OF THE USE OR INABILITY TO USE THE SOFTWARE.
-
-Governing Law & Enforcement
----------------------------
-This License shall be governed by and interpreted in accordance with the
-laws of India. Varun reserves all rights not expressly granted.
-
-Contact for Permission
-----------------------
-For permission to modify, redistribute, or upload the Software, contact:
-   Varun
-   Email: Varunwebso@gmail.com
-
-End of License
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
