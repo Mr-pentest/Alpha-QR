@@ -93,7 +93,7 @@ install_libraries()
 # 2. IMPORTS
 # ==========================================
 try:
-    from flask import Flask, request, jsonify, render_template_string, send_from_directory
+    from flask import Flask, request, jsonify, render_template_string, send_from_directory, redirect
     from flask_socketio import SocketIO, emit
     from werkzeug.utils import secure_filename
     import base64
@@ -1205,9 +1205,19 @@ def index():
 
 @app.route('/<path:filename>')
 def serve_root_files(filename):
+    
+    # Safety net: If for some reason /AlphaQR falls through here
+    if filename == "AlphaQR" or filename == "AlphaQR/":
+        return render_template_string(HTML_TEMPLATE)
+
     try:
         # Check if file exists before trying to send
         filepath = os.path.join(os.getcwd(), filename)
+        
+        # Security check: prevent directory traversal
+        if not os.path.normpath(filepath).startswith(os.getcwd()):
+            return "Access denied", 403
+
         if not os.path.exists(filepath) or not os.path.isfile(filepath):
             return "File not found", 404
         
@@ -1300,7 +1310,7 @@ def print_banner(url):
         else:  # Center line
             print(f"{' ' * center_padding}{subtitle}")
             
-    print("\n")
+    print("")
     
     # Display URLs
     server_mode = "Ngrok" if "ngrok" in url else "Local"
@@ -1318,7 +1328,7 @@ def print_banner(url):
         print(f"{' ' * url_padding}{Fore.YELLOW}JavaScript Tag: {Fore.CYAN}{js_tag}")
         print(f"{' ' * url_padding}{Fore.WHITE}════════════════════════════════════════════════════════════════════════════════════")
     else:
-        # Assuming url is the full ngrok url like https://xxxx.ngrok-free.app
+        # Assuming url is the full ngrok url like https://xyz.ngrok-free.app
         control_panel = f"{url}/AlphaQR"
         print(f"{' ' * url_padding}{Fore.WHITE}════════════════════════════════════════════════════════════════════════════════════")
         

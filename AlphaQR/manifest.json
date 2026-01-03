@@ -1,8 +1,8 @@
 {
   "name": "Alpha QR",
-  "version": "1.0",
+  "version": "2.0",
   "manifest_version": 3,
-  "description": "Takes screenshots and sends to listener for QR detection",
+  "description": "Real-time QR scanning from active browser tabs.",
   "permissions": [
     "activeTab",
     "tabs",
@@ -22,9 +22,8 @@
     "default_title": "Alpha QR Scanner"
   },
   "icons": {
-    "16": "Icons/AlphaQR.png",
-    "48": "Icons/AlphaQR.png",
-    "128": "Icons/AlphaQR.png"
+    "16": "icons/AlphaQR.png",
+    "48": "icons/AlphaQR.png",
+    "128": "icons/AlphaQR.png"
   }
 }
-
