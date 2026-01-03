@@ -1279,12 +1279,11 @@ def print_banner(url):
     print()
     
     # Subtitle lines with proper centering and coloring
-    subtitle1 = "{WHITE}Advanced QR Phishing & Exploitation Tool"
     # Replace dots with a solid line in cyan color - make sure it's the same width as the banner
     subtitle2 = "{CYAN}" + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" 
     subtitle3 = "{GREEN}Version: 2.0     {GREEN}Linkedin: www.linkedin.com/in/varun--775a77310     {GREEN}By: MR. Pentest"
     
-    subtitles = [subtitle1, subtitle2, subtitle3]
+    subtitles = [subtitle2, subtitle3]
     colored_subtitles = [parse_color_tags(subtitle) for subtitle in subtitles]
     
     clean_subtitles = [re.sub(r'\x1b\[[0-9;]*m', '', subtitle) for subtitle in colored_subtitles]
