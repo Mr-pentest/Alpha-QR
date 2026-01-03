@@ -9,6 +9,79 @@ Repository: `https://github.com/Mr-pentest/Alpha-QR.git`
 Alpha QR provides a lightweight local environment for generating and styling QR codes, previewing them in real time, and integrating them into webpages.  
 A companion Chrome extension enables live QR detection directly from the active browser tab.
 
+This project is primarily intended for **authorized security research,
+controlled simulations, and educational demonstrations**.
+
+---
+
+## Terminal-banner
+
+![Terminal-banner](assets/Terminal-banner.png)
+
+Alpha QR startup banner showing the local server status,
+designer URL, and Alpha.js embed information.
+
+---
+
+## Chrome Extension (Live on WhatsApp Login Page)
+
+![Extention](assets/Extention.png)
+
+The Alpha QR browser extension actively scanning a WhatsApp login page.
+This demonstrates real-time QR detection directly from the active browser tab.
+
+---
+
+## QR Designer Interface
+
+![Designer](assets/Designer.png)
+
+The QR Designer interface is used to generate and style QR codes,
+manage detection logic, and configure fallback behavior.
+
+---
+
+## Select (Keyword + HTML Configuration)
+
+![Select](assets/Select.png)
+
+In this step:
+- A chat-loading animation HTML file is uploaded
+- The detection keyword **`have`** is saved
+- The uploaded HTML file is selected as the fallback payload
+
+This configuration is prepared for controlled QR-based simulation.
+
+---
+
+## QR-displayed (Split Tab View)
+
+![QR-displayed](assets/QR-displayed.png)
+
+Split-tab view showing:
+- One page where the QR is detected by the extension
+- One page where the QR output is displayed in real time
+
+This confirms end-to-end QR detection and rendering.
+
+---
+
+## AlphaQR.mp4 — Full Simulation Demo
+
+The video below demonstrates the complete controlled simulation flow.
+
+<video src="assets/AlphaQR.mp4" controls width="100%"></video>
+
+### Demonstrated Flow
+1. Victim-side QR is scanned  
+2. Attacker-side browser session becomes active  
+3. Detection keyword disappears from the attacker interface  
+4. Selected chat-loading animation HTML is displayed on the victim browser  
+5. Victim is redirected to the original `web.whatsapp.com` page  
+
+⚠️ This demonstration is performed **only in a controlled lab environment**
+for security research and awareness purposes.
+
 ---
 
 ## Components
@@ -34,88 +107,3 @@ A companion Chrome extension enables live QR detection directly from the active 
 git clone https://github.com/Mr-pentest/Alpha-QR.git
 cd Alpha-QR
 pip install flask pillow pyzbar qrcode
-```
-
----
-
-## Running the Server
-
-```bash
-python Start.py
-```
-
-Access the QR Designer interface at:
-
-```
-http://localhost:5000/AlphaQR
-```
-
----
-
-## Chrome Extension Setup
-
-1. Open Chrome and navigate to:  
-   `chrome://extensions`
-2. Enable **Developer mode**
-3. Select **Load unpacked**
-4. Choose the `AlphaQR` directory
-
----
-
-## Usage
-
-### Extension
-- Open any target webpage  
-- Click the extension icon  
-- Select **Start Scan** to begin QR detection  
-- Return to the Designer page at `http://localhost:5000/AlphaQR` to view or style the captured data  
-- Click **Stop Scan** to end the session  
-
-### Embedding with `Alpha.js`
-
-Add the following to any webpage:
-
-```html
-<div id="AlphaQR" style="width:300px;height:300px"></div>
-<script src="http://127.0.0.1:5000/Alpha.js"></script>
-```
-
-The QR code will display automatically and update in real time if the extension is active.
-
----
-
-## Example (`test.html`)
-
-1. Run `python Start.py`  
-2. Open `test.html` in a browser  
-3. The live QR preview will appear inside the container  
-
-If needed, update the script source:
-
-```
-http://127.0.0.1:5000/Alpha.js
-```
-
----
-
-## Legal & Responsible Use
-Alpha QR is designed for authorized security analysis, research, and educational applications.  
-Use only in environments where you have explicit permission.
-
----
-
-## Stop / Uninstall
-
-**Stop:**  
-Close the terminal running `Start.py`.
-
-**Uninstall:**  
-Delete the cloned directory and remove the Chrome extension.
-
----
-
-## License
-This project is distributed under a **custom license authored by Varun**.  
-Refer to the `LICENSE` file for full terms and usage rights.
-
----
