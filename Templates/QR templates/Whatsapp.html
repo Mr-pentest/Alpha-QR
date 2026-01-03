@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steps to Log In (Demo Layout)</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f7f7f7;
+        margin: 0;
+        padding: 40px;
+    }
+
+    .container {
+        max-width: 1050px;
+        margin: auto;
+        background: white;
+        padding: 40px;
+        border-radius: 18px;
+        border: 2px solid #d9d9d9;
+        display: flex;
+        justify-content: space-between;
+        gap: 40px;
+    }
+
+    .left {
+        width: 50%;
+        position: relative;
+    }
+
+    h1 {
+        font-size: 36px;
+        margin-bottom: 30px;
+        color: #1a1a1a;
+    }
+
+    /* vertical connector line */
+    .line {
+        position: absolute;
+        left: 16px;
+        top: 94px;
+        width: 2px;
+        height: 220px;
+        background: #222;
+        z-index: 0;
+    }
+
+    .step {
+        display: flex;
+        align-items: center;
+        margin-bottom: 22px;
+        font-size: 20px;
+        color: #222;
+        position: relative;
+        z-index: 2;
+    }
+
+    .step-number {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 2px solid #222;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-right: 16px;
+        font-weight: bold;
+        font-size: 18px;
+        background: white;
+        position: relative;
+        z-index: 3;
+    }
+
+    .checkbox-area {
+        display: flex;
+        align-items: center;
+        margin-top: 35px;
+        font-size: 18px;
+    }
+
+    .checkbox-area input {
+        width: 22px;
+        height: 22px;
+        margin-right: 12px;
+    }
+
+    .qr-box {
+        width: 340px;
+        height: 340px;
+        border-radius: 8px;
+        position: relative;
+    }
+
+    .qr-placeholder {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 38px;
+        color: white;
+        padding: 20px 30px;
+        border-radius: 50%;
+        border: 3px solid white;
+    }
+
+    .login-phone {
+        margin-top: 20px;
+        display: block;
+        text-align: center;
+        font-size: 20px;
+        color: #007b5e;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="left">
+        <h1>Steps to log in</h1>
+
+        <!-- connector line -->
+        <div class="line"></div>
+
+        <div class="step">
+            <div class="step-number">1</div>
+            <div>Open whatsapp</div>
+             <img src="https://img.freepik.com/premium-vector/art-illustration_1166422-325.jpg?semt=ais_hybrid&w=740&q=80" width="30" height="30">
+              <div>on your phone</div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <div>On Android tap menu </div>
+            <img src="https://cdn1.iconfinder.com/data/icons/heroicons-ui/24/dots-vertical-512.png" width="30" height="30">
+                <div>On iphone tap Settings</div>
+                <img src="https://i.sstatic.net/MB1tGCVp.png" width="30" height="30">
+        </div>
+
+        <div class="step">
+            <div class="step-number">3</div>
+            <div>Tap linked devices, then Link device</div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">4</div>
+            <div>Scan the QR to confirm</div>
+        </div>
+
+        <div class="checkbox-area">
+            <input type="checkbox" checked>
+            <label>Stay logged in on this browser</label>
+        </div>
+    </div>
+
+    <div class="right">
+        <div class="qr-box">
+            <div class="AlphaQR" id="AlphaQR"></div>
+        </div>
+
+        <a class="login-phone">Scan Qr to login with whatsapp </a>
+    </div>
+
+</div>
+
+<script src="http://localhost:5000/Alpha.js"></script>
+</body>
+</html>
