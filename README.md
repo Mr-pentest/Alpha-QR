@@ -16,7 +16,7 @@ controlled simulations, and educational demonstrations**.
 
 ## Terminal-banner
 
-![Terminal-banner](assets/Terminal-banner.png)
+![Terminal-banner](Assets/Terminal-banner.png)
 
 Alpha QR startup banner showing the local server status,
 designer URL, and Alpha.js embed information.
@@ -25,7 +25,7 @@ designer URL, and Alpha.js embed information.
 
 ## Chrome Extension (Live on WhatsApp Login Page)
 
-![Extention](assets/Extention.png)
+![Extention](Assets/Extention.png)
 
 The Alpha QR browser extension actively scanning a WhatsApp login page.
 This demonstrates real-time QR detection directly from the active browser tab.
@@ -34,7 +34,7 @@ This demonstrates real-time QR detection directly from the active browser tab.
 
 ## QR Designer Interface
 
-![Designer](assets/Designer.png)
+![Designer](Assets/Designer.png)
 
 The QR Designer interface is used to generate and style QR codes,
 manage detection logic, and configure fallback behavior.
@@ -43,7 +43,7 @@ manage detection logic, and configure fallback behavior.
 
 ## Select (Keyword + HTML Configuration)
 
-![Select](assets/Select.png)
+![Select](Assets/Select.png)
 
 In this step:
 - A chat-loading animation HTML file is uploaded
@@ -56,7 +56,7 @@ This configuration is prepared for controlled QR-based simulation.
 
 ## QR-displayed (Split Tab View)
 
-![QR-displayed](assets/QR-displayed.png)
+![QR-displayed](Assets/QR-displayed.png)
 
 Split-tab view showing:
 - One page where the QR is detected by the extension
@@ -66,11 +66,12 @@ This confirms end-to-end QR detection and rendering.
 
 ---
 
-## AlphaQR.mp4 — Full Simulation Demo
+## Demo
 
 The video below demonstrates the complete controlled simulation flow.
+![QR-displayed](Assets/AlphaQR.gif)
 
-<video src="assets/AlphaQR.mp4" controls width="100%"></video>
+
 
 ### Demonstrated Flow
 1. Victim-side QR is scanned  
