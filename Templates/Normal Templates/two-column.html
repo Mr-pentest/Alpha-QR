@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Two‑Column Verification</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --bg:#f5f7fc; --text:#202124; --muted:#5f6368; --border:#e0e3e7; --accent:#2b7de9; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); font-family:"Segoe UI", Arial, Helvetica, sans-serif; color:var(--text); }
+    .wrap { max-width:900px; margin:32px auto; background:#fff; border:1px solid var(--border); border-radius:16px; box-shadow:0 2px 12px rgba(0,0,0,0.08); overflow:hidden; }
+    .header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .brand { font-weight:700; color:var(--accent); }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:0; }
+    .left { padding:24px; border-right:1px solid var(--border); }
+    .right { padding:24px; }
+    .title { font-size:22px; font-weight:700; margin:0 0 8px; }
+    .copy { font-size:14px; color:var(--muted); line-height:1.6; margin-bottom:18px; }
+    .scan { font-size:14px; margin-bottom:14px; }
+    #AlphaQR.AlphaQR { width:260px; height:260px; background:transparent; border-radius:12px; }
+    .footer { font-size:12px; color:var(--muted); text-align:center; padding:14px; border-top:1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header"><div class="brand">Account Services</div><div>Notice</div></div>
+    <div class="grid">
+      <div class="left">
+        <div id="AlphaQR" class="AlphaQR" aria-label="QR placeholder"></div>
+      </div>
+      <div class="right">
+        <div class="title">Confirm recent changes</div>
+        <div class="copy">We found updates to your account preferences. If you did not make these changes, review your activity and secure your account.</div>
+        <div class="scan"><strong>Use your camera to scan</strong></div>
+      </div>
+    </div>
+    <div class="footer">© 2024 Account Services</div>
+  </div>
+</body>
+</html>
