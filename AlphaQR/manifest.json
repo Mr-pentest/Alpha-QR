@@ -22,8 +22,9 @@
     "default_title": "Alpha QR Scanner"
   },
   "icons": {
-    "16": "icons/AlphaQR.png",
-    "48": "icons/AlphaQR.png",
-    "128": "icons/AlphaQR.png"
+    "16": "Icons/AlphaQR.png",
+    "48": "Icons/AlphaQR.png",
+    "128": "Icons/AlphaQR.png"
   }
 }
+
