@@ -9,16 +9,23 @@ import importlib.util
 import webbrowser
 
 # ==========================================
-# 1. LIBRARY CHECK & INSTALLATION
+# 1. BOOTSTRAP & VENV HANDLING
 # ==========================================
 
-def is_module_installed(module_name):
-    """Check if a Python module is installed without importing it"""
-    return importlib.util.find_spec(module_name) is not None
+VENV_DIR = os.path.join(os.getcwd(), "venv")
+
+def get_python_bin():
+    """Get the path to the virtual environment's python binary"""
+    if platform.system() == "Windows":
+        return os.path.join(VENV_DIR, "Scripts", "python.exe")
+    return os.path.join(VENV_DIR, "bin", "python")
+
+def is_venv():
+    """Check if the current process is running inside a virtual environment"""
+    return (sys.prefix != sys.base_prefix) or os.path.exists(os.path.join(sys.prefix, 'pyvenv.cfg'))
 
 def show_loading_bar(message, total_steps=20, delay=0.05):
     """Show a simple loading bar"""
-    # Simple ANSI yellow color hardcoded for this phase
     YELLOW = "\033[93m"
     RESET = "\033[0m"
     bar_width = 30
@@ -32,9 +39,8 @@ def show_loading_bar(message, total_steps=20, delay=0.05):
     sys.stdout.write('\n')
     sys.stdout.flush()
 
-def install_libraries():
-    """Install required Python modules silently"""
-    # Map import name to package name
+def bootstrap():
+    """Ensure environment is ready. Venv for Linux, direct for Windows."""
     required_modules = {
         'flask': 'flask',
         'flask_socketio': 'flask-socketio',
@@ -47,47 +53,55 @@ def install_libraries():
         'pyngrok': 'pyngrok',
         'requests': 'requests'
     }
-    
-    missing = []
-    for mod, pkg in required_modules.items():
-        if not is_module_installed(mod):
-            missing.append(pkg)
+
+    # --- LINUX VENV LOGIC ---
+    if platform.system() != "Windows":
+        if not is_venv():
+            print("\033[93mLinux detected: Setting up environment...\033[0m")
             
-    if not missing:
-        return
+            # Install Tesseract binary on Linux if missing
+            if not shutil.which("tesseract"):
+                print("\033[93mTesseract engine not found. Installing via apt...\033[0m")
+                try:
+                    # Run apt update and install
+                    subprocess.run(["sudo", "apt", "update"], check=True)
+                    subprocess.run(["sudo", "apt", "install", "-y", "tesseract-ocr", "libtesseract-dev"], check=True)
+                    print("\033[92m✓ Tesseract engine installed successfully.\033[0m")
+                except Exception as e:
+                    print(f"\033[91mFailed to install Tesseract binary: {e}\033[0m")
+                    print("\033[93mPlease install it manually: sudo apt install tesseract-ocr libtesseract-dev -y\033[0m")
 
-    # Show installing message in Yellow
-    print("\033[93mInstalling missing dependencies...\033[0m")
-    
-    # Handle Linux Virtual Env
-    is_venv = (sys.prefix != sys.base_prefix)
-    if platform.system() != "Windows" and not is_venv:
-        # Simplified venv handling for Linux - just try to use pip with --user or sudo if needed
-        # But per user request: "linux me jo virtual env ki problem hoti h usko solve kar de virtual environment banakar"
-        venv_dir = os.path.join(os.getcwd(), "venv")
-        if not os.path.exists(venv_dir):
-            print("\033[93mCreating virtual environment...\033[0m")
-            subprocess.run([sys.executable, "-m", "venv", venv_dir])
-        
-        # We are running inside the main python process. 
-        # If we just created venv, we should technically restart script inside venv.
-        # However, for simplicity in this turn, we will try to install to current env or user env.
-        # If user REALLY wants venv enforcement, we would need to exec into the venv python.
-        
-        # Let's try to install using the current executable
-        pass
+            if not os.path.exists(VENV_DIR):
+                subprocess.run([sys.executable, "-m", "venv", "venv"], check=True)
+            
+            python_bin = get_python_bin()
+            
+            # Check and install inside venv
+            for mod, pkg in required_modules.items():
+                check = subprocess.run([python_bin, "-c", f"import importlib.util; exit(0 if importlib.util.find_spec('{mod}') else 1)"], 
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if check.returncode != 0:
+                    show_loading_bar(f"Installing {pkg} in venv")
+                    subprocess.run([python_bin, "-m", "pip", "install", pkg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            print("\033[92m✓ Venv ready. Restarting AlphaQR inside venv...\033[0m")
+            os.execv(python_bin, [python_bin] + sys.argv)
+            sys.exit(0)
 
-    for pkg in missing:
-        show_loading_bar(f"Installing {pkg}")
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg], 
-                                  stdout=subprocess.DEVNULL, 
-                                  stderr=subprocess.DEVNULL)
-        except Exception as e:
-            print(f"\033[91mFailed to install {pkg}: {e}\033[0m")
+    # --- WINDOWS / IN-VENV LOGIC ---
+    print("\033[93mChecking dependencies...\033[0m")
+    for mod, pkg in required_modules.items():
+        if not importlib.util.find_spec(mod):
+            show_loading_bar(f"Installing {pkg}")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", pkg], 
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                print(f"\033[91mFailed to install {pkg}: {e}\033[0m")
 
-# Perform installation check before importing 3rd party libs
-install_libraries()
+# Run bootstrap
+if __name__ == "__main__":
+    bootstrap()
 
 # ==========================================
 # 2. IMPORTS
@@ -110,7 +124,7 @@ try:
     from pyngrok import ngrok, conf
     import requests
 except ImportError as e:
-    print(f"Critical Error: Failed to import dependencies after installation attempt. {e}")
+    print(f"Critical Error: Failed to import dependencies. {e}")
     sys.exit(1)
 
 # Initialize Colorama
@@ -121,7 +135,6 @@ init(autoreset=True)
 # ==========================================
 
 # Tesseract Configuration
-# Note: On Linux/Mac this path might be different or not needed if in PATH
 if platform.system() == "Windows":
     pytesseract.pytesseract.tesseract_cmd = r"C:\Users\Indian\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
@@ -1310,7 +1323,7 @@ def print_banner(url):
         else:  # Center line
             print(f"{' ' * center_padding}{subtitle}")
             
-    print("")
+    print("\n")
     
     # Display URLs
     server_mode = "Ngrok" if "ngrok" in url else "Local"
@@ -1328,7 +1341,7 @@ def print_banner(url):
         print(f"{' ' * url_padding}{Fore.YELLOW}JavaScript Tag: {Fore.CYAN}{js_tag}")
         print(f"{' ' * url_padding}{Fore.WHITE}════════════════════════════════════════════════════════════════════════════════════")
     else:
-        # Assuming url is the full ngrok url like https://xyz.ngrok-free.app
+        # Assuming url is the full ngrok url like https://xxxx.ngrok-free.app
         control_panel = f"{url}/AlphaQR"
         print(f"{' ' * url_padding}{Fore.WHITE}════════════════════════════════════════════════════════════════════════════════════")
         
