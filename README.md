@@ -101,10 +101,61 @@ for security research and awareness purposes.
 - Google Chrome or Chromium  
 
 ---
+# Installation
 
-## Installation
+Normally `Start.py` automatically installs dependencies and sets up the environment.
+
+If automatic setup fails, use the manual steps below.
+
+---
+
+## Create Virtual Environment
+
+### Linux / macOS
 
 ```bash
-git clone https://github.com/Mr-pentest/Alpha-QR.git
-cd Alpha-QR
-pip install flask pillow pyzbar qrcode
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### Windows
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+---
+
+## Install Python Requirements
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Install Tesseract OCR (Linux)
+
+```bash
+sudo apt update
+sudo apt install tesseract-ocr -y
+```
+
+> Windows users need to manually install the Tesseract OCR `.exe` package and set the path inside `Start.py`.
+
+---
+
+## Run Alpha QR
+
+```bash
+python Start.py
+```
+
+---
+
+## Open Control Panel
+
+```text
+http://localhost:5000/AlphaQR
+```
