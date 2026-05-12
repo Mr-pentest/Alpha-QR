@@ -1,0 +1,11 @@
+flask
+flask-socketio
+pillow
+pyzbar
+qrcode
+pytesseract
+numpy
+colorama
+pyngrok
+requests
+werkzeug
