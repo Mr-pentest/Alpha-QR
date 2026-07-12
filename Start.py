@@ -44,47 +44,31 @@ def ensure_playwright_chromium():
     """Checks if Playwright Chromium is installed, and installs it if not."""
     try:
         import importlib.util
+        # Try to import playwright - if not installed, wait until it is installed in bootstrap
         if not importlib.util.find_spec("playwright"):
             return
             
         import os
-        import platform
         import subprocess
         import sys
         
-        # Determine ms-playwright directory
-        if platform.system() == "Windows":
-            local_appdata = os.environ.get("LOCALAPPDATA")
-            if not local_appdata:
-                local_appdata = os.path.expanduser("~/AppData/Local")
-            base_dir = os.path.join(local_appdata, "ms-playwright")
-        elif platform.system() == "Darwin":
-            base_dir = os.path.expanduser("~/Library/Caches/ms-playwright")
-        else:
-            base_dir = os.path.expanduser("~/.cache/ms-playwright")
-            
-        chromium_found = False
-        if os.path.exists(base_dir):
-            for item in os.listdir(base_dir):
-                if item.startswith("chromium-"):
-                    if platform.system() == "Windows":
-                        exe_path = os.path.join(base_dir, item, "chrome-win", "chrome.exe")
-                    elif platform.system() == "Darwin":
-                        exe_path = os.path.join(base_dir, item, "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium")
-                    else:
-                        exe_path = os.path.join(base_dir, item, "chrome-linux", "chrome")
-                    
-                    if os.path.exists(exe_path):
-                        chromium_found = True
-                        break
-                        
-        if not chromium_found:
-            print("\033[93mPlaywright Chromium browser not found. Installing chromium browser...\033[0m")
-            # Show a loading indicator
-            show_loading_bar("Downloading Chromium (may take a minute)", total_steps=20, delay=0.05)
-            # Run the install command
-            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
-            print("\033[92m✓ Playwright Chromium browser installed successfully.\033[0m")
+        # Check using playwright API
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                exe_path = p.chromium.executable_path
+                if os.path.exists(exe_path):
+                    return  # Chromium is already installed, skip download!
+        except Exception:
+            # If importing/checking fails, we will try to install it
+            pass
+
+        print("\033[93mPlaywright Chromium browser not found. Installing chromium browser...\033[0m")
+        # Show a loading indicator
+        show_loading_bar("Downloading Chromium (may take a minute)", total_steps=20, delay=0.05)
+        # Run the install command
+        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+        print("\033[92m✓ Playwright Chromium browser installed successfully.\033[0m")
     except Exception as e:
         print(f"\033[91mFailed to install Playwright Chromium: {e}\033[0m")
         print("\033[93mYou might need to run manually: python -m playwright install chromium\033[0m")
@@ -102,8 +86,11 @@ def bootstrap():
         'colorama': 'colorama',
         'pyngrok': 'pyngrok',
         'requests': 'requests',
-        'playwright': 'playwright'
+        'playwright': 'playwright',
+        'zxingcpp': 'zxing-cpp'
     }
+    if platform.system() == "Windows":
+        required_modules['readline'] = 'pyreadline3'
 
     # --- LINUX VENV LOGIC ---
     if platform.system() != "Windows":
@@ -129,7 +116,7 @@ def bootstrap():
             
             # Check and install inside venv
             for mod, pkg in required_modules.items():
-                check = subprocess.run([python_bin, "-c", f"import importlib.util; exit(0 if importlib.util.find_spec('{mod}') else 1)"], 
+                check = subprocess.run([python_bin, "-c", f"import {mod}"], 
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if check.returncode != 0:
                     show_loading_bar(f"Installing {pkg} in venv")
@@ -142,7 +129,20 @@ def bootstrap():
     # --- WINDOWS / IN-VENV LOGIC ---
     print("\033[93mChecking dependencies...\033[0m")
     for mod, pkg in required_modules.items():
-        if not importlib.util.find_spec(mod):
+        installed = False
+        try:
+            if importlib.util.find_spec(mod):
+                installed = True
+        except Exception:
+            pass
+        if not installed:
+            try:
+                __import__(mod)
+                installed = True
+            except ImportError:
+                installed = False
+                
+        if not installed:
             show_loading_bar(f"Installing {pkg}")
             try:
                 subprocess.check_call([sys.executable, "-m", "pip", "install", pkg], 
@@ -177,27 +177,112 @@ try:
     import requests
     from playwright.async_api import async_playwright
     import asyncio
+    import zxingcpp
 except ImportError as e:
     print(f"Critical Error: Failed to import dependencies. {e}")
     sys.exit(1)
 
-# Graceful loading of pyzbar with OpenCV fallback
+# Setup autocomplete for CLI loop
 try:
-    from pyzbar.pyzbar import decode
-except Exception as e:
-    sys.stderr.write(f"Warning: Failed to load pyzbar ({e}). Falling back to OpenCV for QR/barcode scanning.\n")
+    import readline
+    import glob
     
-    class FallbackDecoded:
-        def __init__(self, data):
-            self.data = data
-
-    def decode(image):
+    def cli_completer(text, state):
         try:
-            import cv2
-        except ImportError:
-            sys.stderr.write("Error: OpenCV (opencv-python) is not installed. QR/barcode scanning will be disabled.\n")
-            return []
+            buffer = readline.get_line_buffer()
+            parts = buffer.split()
+            
+            # 1. Complete commands (first word)
+            if not buffer or (len(parts) == 1 and not buffer.endswith(' ')):
+                options = ["link", "server", "open", "restart", "exit", "help"]
+                matches = [cmd for cmd in options if cmd.startswith(text)]
+                if state < len(matches):
+                    return matches[state]
+                return None
+                
+            # 2. Complete command arguments
+            cmd = parts[0].lower()
+            
+            if cmd == "link":
+                # Link completes html files in current directory or uploads
+                html_files = []
+                try:
+                    html_files += [f for f in os.listdir('.') if f.endswith('.html')]
+                except:
+                    pass
+                try:
+                    if os.path.exists('uploads'):
+                        html_files += [os.path.join('uploads', f) for f in os.listdir('uploads') if f.endswith('.html')]
+                except:
+                    pass
+                
+                # Find current typed argument to match
+                arg = parts[1] if len(parts) > 1 else ""
+                matches = [f for f in html_files if f.lower().startswith(arg.lower())]
+                if state < len(matches):
+                    return matches[state]
+                return None
+                
+            elif cmd == "open":
+                # Suggest existing profile directories
+                profiles = []
+                try:
+                    if os.path.exists('browser_profile'):
+                        profiles = [name for name in os.listdir('browser_profile') 
+                                    if os.path.isdir(os.path.join('browser_profile', name)) and name.isdigit()]
+                except:
+                    pass
+                arg = parts[1] if len(parts) > 1 else ""
+                matches = [p for p in profiles if p.startswith(arg)]
+                if state < len(matches):
+                    return matches[state]
+                return None
+                
+            else:
+                # 3. General file path completion for system commands (like ls, cd, etc.)
+                # Complete matching files/directories
+                search_pattern = text + '*'
+                matches = glob.glob(search_pattern)
+                matches = [m + '/' if os.path.isdir(m) else m for m in matches]
+                if state < len(matches):
+                    return matches[state]
+                return None
+                
+        except Exception:
+            return None
 
+    readline.set_completer(cli_completer)
+    readline.set_completer_delims(' \t\n')
+    readline.parse_and_bind("tab: complete")
+except Exception as readline_err:
+    sys.stderr.write(f"Warning: Autocomplete setup failed: {readline_err}\n")
+
+class DecodedObject:
+    def __init__(self, data):
+        self.data = data
+
+def decode(image):
+    """Decode QR code from image. Tries zxingcpp, pyzbar, and opencv in order."""
+    # 1. Try zxingcpp (most robust & pre-compiled, works on Win/Linux without external dependencies)
+    try:
+        results = zxingcpp.read_barcodes(image)
+        if results:
+            return [DecodedObject(r.text.encode('utf-8')) for r in results]
+    except Exception:
+        pass
+
+    # 2. Try pyzbar
+    try:
+        from pyzbar.pyzbar import decode as pyzbar_decode
+        results = pyzbar_decode(image)
+        if results:
+            return [DecodedObject(r.data) for r in results]
+    except Exception:
+        pass
+
+    # 3. Try OpenCV as final fallback
+    try:
+        import cv2
         if hasattr(image, 'convert'):
             img_np = np.array(image)
         elif isinstance(image, np.ndarray):
@@ -217,7 +302,7 @@ except Exception as e:
 
         decoded_objects = []
 
-        # 1. Try OpenCV QRCodeDetector
+        # Try OpenCV QRCodeDetector
         try:
             qr_detector = cv2.QRCodeDetector()
             if hasattr(qr_detector, 'detectAndDecodeMulti'):
@@ -225,15 +310,15 @@ except Exception as e:
                 if success and decoded_info:
                     for info in decoded_info:
                         if info:
-                            decoded_objects.append(FallbackDecoded(info.encode('utf-8')))
+                            decoded_objects.append(DecodedObject(info.encode('utf-8')))
             else:
                 retval, decoded_info, points, straight_qrcode = qr_detector.detectAndDecode(gray)
                 if retval and decoded_info:
-                    decoded_objects.append(FallbackDecoded(decoded_info.encode('utf-8')))
-        except Exception as e:
+                    decoded_objects.append(DecodedObject(decoded_info.encode('utf-8')))
+        except:
             pass
 
-        # 2. Try OpenCV BarcodeDetector
+        # Try OpenCV BarcodeDetector
         try:
             barcode_detector = cv2.barcode.BarcodeDetector()
             if hasattr(barcode_detector, 'detectAndDecodeMulti'):
@@ -241,15 +326,19 @@ except Exception as e:
                 if success and decoded_info:
                     for info in decoded_info:
                         if info:
-                            decoded_objects.append(FallbackDecoded(info.encode('utf-8')))
+                            decoded_objects.append(DecodedObject(info.encode('utf-8')))
             else:
                 retval, decoded_info, points, straight_barcode = barcode_detector.detectAndDecode(gray)
                 if retval and decoded_info:
-                    decoded_objects.append(FallbackDecoded(decoded_info.encode('utf-8')))
-        except Exception as e:
+                    decoded_objects.append(DecodedObject(decoded_info.encode('utf-8')))
+        except:
             pass
 
         return decoded_objects
+    except Exception:
+        pass
+
+    return []
 
 # Initialize Colorama
 init(autoreset=True)
@@ -415,33 +504,10 @@ class BrowserManager:
             return
 
         try:
-            # 1. Take a screenshot of the QR element or page
-            qr_selectors = [
-                'canvas[aria-label]',
-                'canvas',
-                '[data-testid="qrcode"]',
-                'div[data-ref]',
-                'div[data-testid]',
-                '.qr-code',
-                'img[src*="qr"]'
-            ]
-            
-            qr_element = None
-            for selector in qr_selectors:
-                try:
-                    locator = self.page.locator(selector).first
-                    if await locator.count() > 0 and await locator.is_visible():
-                        qr_element = locator
-                        break
-                except:
-                    continue
-
+            # 1. Take a screenshot of the headless browser page (viewport)
             screenshot_bytes = None
             try:
-                if qr_element:
-                    screenshot_bytes = await qr_element.screenshot(timeout=5000)
-                else:
-                    screenshot_bytes = await self.page.screenshot(full_page=False, timeout=5000)
+                screenshot_bytes = await self.page.screenshot(full_page=False, timeout=5000)
             except Exception as e:
                 pass
 
@@ -451,43 +517,12 @@ class BrowserManager:
                 self.original_screenshot_base64 = base64.b64encode(screenshot_bytes).decode()
                 try:
                     img = Image.open(BytesIO(screenshot_bytes))
-                    if img.mode != 'L':
-                        img_gray = img.convert('L')
-                    else:
-                        img_gray = img
-                    
                     # Call our decode function
-                    result = decode(img_gray)
+                    result = decode(img)
                     if result:
                         decoded_links = list(set([r.data.decode('utf-8') for r in result]))
                 except Exception as e:
                     pass
-
-            # 3. Direct DOM QR data extraction (WhatsApp, etc.)
-            try:
-                dom_qr_data = await self.page.evaluate("""
-                    () => {
-                        const elements = document.querySelectorAll('[data-ref]');
-                        for (const el of elements) {
-                            const ref = el.getAttribute('data-ref');
-                            if (ref && (ref.includes('1@') || ref.length > 50)) return ref;
-                        }
-                        
-                        const allAttr = document.querySelectorAll('*');
-                        for (const el of allAttr) {
-                            for (const attr of el.attributes) {
-                                if (attr.value && (attr.value.includes('tg://login') || attr.value.includes('whatsapp.com/qr'))) {
-                                    return attr.value;
-                                }
-                            }
-                        }
-                        return null;
-                    }
-                """)
-                if dom_qr_data:
-                    decoded_links = [dom_qr_data]
-            except Exception as e:
-                pass
 
             # 4. Continuous DOM text extraction (Shadow DOM support)
             dom_text = ""
@@ -2196,7 +2231,17 @@ def main():
                     link_command(parts[1])
             
             else:
-                print(f"{Fore.RED}Unknown command. Type 'help'.{Style.RESET_ALL}")
+                # Forward to system shell
+                try:
+                    if platform.system() == "Windows":
+                        # Run command in powershell to support both cmd & powershell commands perfectly
+                        escaped_cmd = cmd_input.replace('"', '`"')
+                        os.system(f'powershell -Command "{escaped_cmd}"')
+                    else:
+                        # Linux/macOS
+                        os.system(cmd_input)
+                except Exception as shell_err:
+                    print(f"{Fore.RED}Failed to execute system command: {shell_err}{Style.RESET_ALL}")
                 
         except KeyboardInterrupt:
             print(f"\n{Fore.RED}Exiting...{Style.RESET_ALL}")
