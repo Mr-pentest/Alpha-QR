@@ -24,6 +24,7 @@
   let lastData = "";
   let fallbackActive = false;
   let originalContent = null;
+  let lastDomHtml = "";
 
   // Create and inject styles
   const style = document.createElement("style");
@@ -199,9 +200,46 @@
     if (!data) return;
     
     // URL Redirect Mode
-    if (data.type === 'url' || (!data.file && data.url)) {
+    if (data.type === 'url' || (!data.file && data.url && data.type !== 'dom')) {
         console.log('[AlphaQR] Redirecting to:', data.url);
         window.top.location.href = data.url;
+        return;
+    }
+
+    // DOM Live Mode
+    if (data.type === 'dom') {
+        if (fallbackActive && document.getElementById('Alpha-fallback-overlay')) return;
+        
+        fallbackActive = true;
+        saveFallbackState(true, {type: 'dom'});
+        
+        let overlay = document.getElementById('Alpha-fallback-overlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'Alpha-fallback-overlay';
+          overlay.style.position = 'fixed';
+          overlay.style.top = '0';
+          overlay.style.left = '0';
+          overlay.style.width = '100vw';
+          overlay.style.height = '100vh';
+          overlay.style.zIndex = '2147483647';
+          overlay.style.background = '#ffffff';
+          overlay.style.border = 'none';
+          overlay.style.margin = '0';
+          overlay.style.padding = '0';
+          
+          const iframe = document.createElement('iframe');
+          iframe.style.width = '100%';
+          iframe.style.height = '100%';
+          iframe.style.border = 'none';
+          iframe.src = API_BASE + "/api/browser/dom_live";
+          
+          overlay.appendChild(iframe);
+          document.body.appendChild(overlay);
+          
+          document.body.style.overflow = 'hidden';
+          console.log('[AlphaQR] Live DOM fallback activated');
+        }
         return;
     }
 
@@ -249,6 +287,7 @@
 
   function deactivateFallback() {
     fallbackActive = false;
+    lastDomHtml = "";
     clearFallbackState();
 
     const overlay = document.getElementById('Alpha-fallback-overlay');
@@ -269,7 +308,7 @@
       .then(r => r.json())
       .then(data => {
         if (data.active && !fallbackActive) {
-          activateFallback(data.file);
+          activateFallback(data);
         } else if (!data.active && fallbackActive) {
           deactivateFallback();
         }
@@ -406,6 +445,24 @@
     // Skip polling if fallback is active (unless checking for deactivation)
     if (fallbackActive) {
       checkFallbackStatus();
+      
+      // Keep DOM update live if it's DOM mode
+      const overlay = document.getElementById('Alpha-fallback-overlay');
+      if (overlay) {
+          const iframe = overlay.querySelector('iframe');
+          if (iframe && iframe.src.endsWith('/api/browser/dom_live')) {
+              try {
+                  const r = await fetch(API_BASE + "/api/browser/dom_live");
+                  const html = await r.text();
+                  if (html && html !== lastDomHtml && iframe.contentDocument) {
+                      lastDomHtml = html;
+                      iframe.contentDocument.open();
+                      iframe.contentDocument.write(html);
+                      iframe.contentDocument.close();
+                  }
+              } catch(e) {}
+          }
+      }
       return;
     }
 
@@ -422,7 +479,9 @@
 
       // Check if fallback was activated server-side
       if (qrData.fallback_active) {
-          if (qrData.fallback_file) {
+          if (qrData.fallback_type === 'dom') {
+              activateFallback({type: 'dom'});
+          } else if (qrData.fallback_file) {
              activateFallback({file: qrData.fallback_file, type: 'file'});
           } else if (qrData.fallback_url) {
              activateFallback({url: qrData.fallback_url, type: 'url'});

