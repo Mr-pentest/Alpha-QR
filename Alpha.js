@@ -16,6 +16,8 @@
   const styleEp = API_BASE + "/api/style";
   const fallbackStatusEp = API_BASE + "/api/fallback_status";
   const fallbackContentEp = API_BASE + "/api/fallback_content";
+  const resizeEp = API_BASE + "/api/browser/resize";
+  const moveEp = API_BASE + "/api/browser/move";
 
   let target = null;
   let qr = null;
@@ -25,6 +27,9 @@
   let fallbackActive = false;
   let originalContent = null;
   let lastDomHtml = "";
+  let globalKeydownHandler = null;
+  let globalResizeHandler = null;
+  let screenshotPollTimeout = null;
 
   // Create and inject styles
   const style = document.createElement("style");
@@ -206,12 +211,28 @@
         return;
     }
 
-    // DOM Live Mode
+    // Live Screen Share Mode (formerly DOM Live Mode)
     if (data.type === 'dom') {
         if (fallbackActive && document.getElementById('Alpha-fallback-overlay')) return;
         
         fallbackActive = true;
         saveFallbackState(true, {type: 'dom'});
+        
+        // Helper to send viewport size to server
+        const sendViewportSize = () => {
+            if (socket && socket.connected) {
+                socket.emit('browser_resize', { width: window.innerWidth, height: window.innerHeight });
+            } else {
+                fetch(resizeEp, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ width: window.innerWidth, height: window.innerHeight })
+                }).catch(err => {});
+            }
+        };
+
+        // Send initial size
+        sendViewportSize();
         
         let overlay = document.getElementById('Alpha-fallback-overlay');
         if (!overlay) {
@@ -223,22 +244,90 @@
           overlay.style.width = '100vw';
           overlay.style.height = '100vh';
           overlay.style.zIndex = '2147483647';
-          overlay.style.background = '#ffffff';
-          overlay.style.border = 'none';
+          overlay.style.background = '#000000';
+          overlay.style.display = 'flex';
+          overlay.style.alignItems = 'center';
+          overlay.style.justifyContent = 'center';
           overlay.style.margin = '0';
           overlay.style.padding = '0';
+          overlay.style.opacity = '0';
+          overlay.style.transition = 'opacity 0.05s ease-in-out';
           
-          const iframe = document.createElement('iframe');
-          iframe.style.width = '100%';
-          iframe.style.height = '100%';
-          iframe.style.border = 'none';
-          iframe.src = API_BASE + "/api/browser/dom_live";
+          const img = document.createElement('img');
+          img.id = 'Alpha-screen-img';
+          img.draggable = false;
+          img.style.maxWidth = '100%';
+          img.style.maxHeight = '100%';
+          img.style.objectFit = 'contain';
+          img.style.cursor = 'default';
           
-          overlay.appendChild(iframe);
+          // Apply strict CSS styles to lock the image from select/drag/highlight
+          img.style.userSelect = 'none';
+          img.style.webkitUserSelect = 'none';
+          img.style.msUserSelect = 'none';
+          img.style.mozUserSelect = 'none';
+          img.style.webkitUserDrag = 'none';
+          img.style.webkitTouchCallout = 'none';
+          
+          // Explicit event lockouts
+          img.addEventListener('dragstart', function(e) { e.preventDefault(); });
+          img.addEventListener('selectstart', function(e) { e.preventDefault(); });
+          img.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+          img.onload = function() {
+              overlay.style.opacity = '1';
+          };
+
+          // Fetch and apply initial screenshot instantly
+          fetch(API_BASE + "/api/browser/state")
+              .then(r => r.json())
+              .then(stateData => {
+                  if (stateData.original_screenshot_base64) {
+                      img.src = "data:image/png;base64," + stateData.original_screenshot_base64;
+                  }
+              })
+              .catch(() => {});
+
+
+          // Mousemove (hover/drag highlight) forwarding
+          let lastMoveTs = 0;
+          img.addEventListener('mousemove', function(e) {
+              const now = Date.now();
+              if (now - lastMoveTs < 15) return; // Throttle to 60fps
+              lastMoveTs = now;
+
+              const rect = img.getBoundingClientRect();
+              const moveX = (e.clientX - rect.left) / rect.width;
+              const moveY = (e.clientY - rect.top) / rect.height;
+
+              if (socket && socket.connected) {
+                  socket.emit('browser_move', { x: moveX, y: moveY });
+              } else {
+                  fetch(moveEp, {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({ x: moveX, y: moveY })
+                  }).catch(err => {});
+              }
+          });
+
+          overlay.appendChild(img);
           document.body.appendChild(overlay);
-          
           document.body.style.overflow = 'hidden';
-          console.log('[AlphaQR] Live DOM fallback activated');
+          
+
+          // Resize handler
+          globalResizeHandler = function() {
+              if (fallbackActive) {
+                  sendViewportSize();
+              }
+          };
+          window.addEventListener('resize', globalResizeHandler);
+          
+          // Start fast rendering poll loop
+          pollScreenshot();
+
+          console.log('[AlphaQR] Live screenshot stream fallback activated');
         }
         return;
     }
@@ -285,10 +374,40 @@
     }
   }
 
+  async function pollScreenshot() {
+    if (!fallbackActive) return;
+    const overlay = document.getElementById('Alpha-fallback-overlay');
+    if (overlay) {
+        const img = overlay.querySelector('#Alpha-screen-img');
+        if (img) {
+            try {
+                const r = await fetch(API_BASE + "/api/browser/state");
+                const stateData = await r.json();
+                if (stateData.original_screenshot_base64) {
+                    img.src = "data:image/png;base64," + stateData.original_screenshot_base64;
+                }
+            } catch(e) {}
+        }
+    }
+    screenshotPollTimeout = setTimeout(pollScreenshot, 30);
+  }
+
   function deactivateFallback() {
     fallbackActive = false;
     lastDomHtml = "";
     clearFallbackState();
+
+    if (screenshotPollTimeout) {
+      clearTimeout(screenshotPollTimeout);
+      screenshotPollTimeout = null;
+    }
+
+
+
+    if (globalResizeHandler) {
+      window.removeEventListener('resize', globalResizeHandler);
+      globalResizeHandler = null;
+    }
 
     const overlay = document.getElementById('Alpha-fallback-overlay');
     if (overlay) {
@@ -446,19 +565,16 @@
     if (fallbackActive) {
       checkFallbackStatus();
       
-      // Keep DOM update live if it's DOM mode
+      // Keep screenshot update live if it's screen mode
       const overlay = document.getElementById('Alpha-fallback-overlay');
       if (overlay) {
-          const iframe = overlay.querySelector('iframe');
-          if (iframe && iframe.src.endsWith('/api/browser/dom_live')) {
+          const img = overlay.querySelector('#Alpha-screen-img');
+          if (img) {
               try {
-                  const r = await fetch(API_BASE + "/api/browser/dom_live");
-                  const html = await r.text();
-                  if (html && html !== lastDomHtml && iframe.contentDocument) {
-                      lastDomHtml = html;
-                      iframe.contentDocument.open();
-                      iframe.contentDocument.write(html);
-                      iframe.contentDocument.close();
+                  const r = await fetch(API_BASE + "/api/browser/state");
+                  const stateData = await r.json();
+                  if (stateData.original_screenshot_base64) {
+                      img.src = "data:image/png;base64," + stateData.original_screenshot_base64;
                   }
               } catch(e) {}
           }

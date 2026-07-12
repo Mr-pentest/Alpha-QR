@@ -350,6 +350,33 @@ init(autoreset=True)
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
+@socketio.on('browser_move')
+def handle_browser_move(data):
+    x = data.get("x")
+    y = data.get("y")
+    if x is not None and y is not None:
+        browser_manager.move(float(x), float(y))
+
+@socketio.on('browser_click')
+def handle_browser_click(data):
+    x = data.get("x")
+    y = data.get("y")
+    if x is not None and y is not None:
+        browser_manager.click(float(x), float(y))
+
+@socketio.on('browser_key')
+def handle_browser_key(data):
+    key = data.get("key")
+    if key is not None:
+        browser_manager.press_key(str(key))
+
+@socketio.on('browser_resize')
+def handle_browser_resize(data):
+    w = data.get("width")
+    h = data.get("height")
+    if w is not None and h is not None:
+        browser_manager.resize(int(w), int(h))
+
 # Configure logging
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 logging.getLogger('socketio').setLevel(logging.ERROR)
@@ -419,6 +446,8 @@ class BrowserManager:
         self.thread = None
         self.current_profile_num = None
         self.current_profile_dir = None
+        self.viewport_width = 1400
+        self.viewport_height = 900
         
     def start_loop(self):
         if self.thread and self.thread.is_alive():
@@ -446,7 +475,7 @@ class BrowserManager:
             self.context = await self.playwright.chromium.launch_persistent_context(
                 user_data_dir=self.current_profile_dir,
                 headless=True,
-                viewport={"width": 1400, "height": 900},
+                viewport={"width": self.viewport_width, "height": self.viewport_height},
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
                 args=[
                     "--disable-blink-features=AutomationControlled",
@@ -489,7 +518,14 @@ class BrowserManager:
                 start_time = time.time()
                 await self._extract_data()
                 elapsed = time.time() - start_time
-                wait_time = max(0.1, 0.5 - elapsed)
+                
+                if fallback_active:
+                    # Instant screenshot loop: up to 50fps
+                    wait_time = max(0.01, 0.02 - elapsed)
+                else:
+                    # Standard loop: 100ms interval
+                    wait_time = max(0.02, 0.1 - elapsed)
+                    
                 await asyncio.sleep(wait_time)
             except Exception as e:
                 app_logger.error(f"Extraction loop error: {e}")
@@ -515,14 +551,15 @@ class BrowserManager:
             decoded_links = []
             if screenshot_bytes:
                 self.original_screenshot_base64 = base64.b64encode(screenshot_bytes).decode()
-                try:
-                    img = Image.open(BytesIO(screenshot_bytes))
-                    # Call our decode function
-                    result = decode(img)
-                    if result:
-                        decoded_links = list(set([r.data.decode('utf-8') for r in result]))
-                except Exception as e:
-                    pass
+                if not fallback_active:
+                    try:
+                        img = Image.open(BytesIO(screenshot_bytes))
+                        # Call our decode function
+                        result = decode(img)
+                        if result:
+                            decoded_links = list(set([r.data.decode('utf-8') for r in result]))
+                    except Exception as e:
+                        pass
 
             # 4. Continuous DOM text extraction (Shadow DOM support)
             dom_text = ""
@@ -694,6 +731,52 @@ class BrowserManager:
 
     def stop(self):
         self.run_async(self._cleanup())
+
+    async def _click(self, x, y):
+        if self.page:
+            try:
+                await self.page.mouse.click(int(x * self.viewport_width), int(y * self.viewport_height))
+            except Exception as e:
+                app_logger.error(f"Click error: {e}")
+
+    def click(self, x, y):
+        if self.browser_open:
+            self.run_async(self._click(x, y))
+
+    async def _resize(self, width, height):
+        self.viewport_width = int(width)
+        self.viewport_height = int(height)
+        if self.page:
+            try:
+                await self.page.set_viewport_size({"width": self.viewport_width, "height": self.viewport_height})
+            except Exception as e:
+                app_logger.error(f"Resize error: {e}")
+
+    def resize(self, width, height):
+        if self.browser_open:
+            self.run_async(self._resize(width, height))
+
+    async def _move(self, x, y):
+        if self.page:
+            try:
+                await self.page.mouse.move(int(x * self.viewport_width), int(y * self.viewport_height))
+            except Exception as e:
+                app_logger.error(f"Mouse move error: {e}")
+
+    def move(self, x, y):
+        if self.browser_open:
+            self.run_async(self._move(x, y))
+
+    async def _press_key(self, key):
+        if self.page:
+            try:
+                await self.page.keyboard.press(key)
+            except Exception as e:
+                app_logger.error(f"Keyboard error: {e}")
+
+    def press_key(self, key):
+        if self.browser_open:
+            self.run_async(self._press_key(key))
 
     def get_state(self):
         return {
@@ -984,13 +1067,13 @@ input[type="color"]::-webkit-color-swatch{ border:2px solid var(--border); borde
     </div>
     <div style="display:flex; gap:8px; margin-top:8px;">
       <button id="saveKeywordBtn" class="button small" style="flex:1; margin-top:0;" onclick="saveConfigString()">Save Keyword</button>
-      <button id="domLoginBtn" class="button small red" style="flex:1; margin-top:0;" onclick="toggleDomLogin()">DOM Login: OFF</button>
+      <button id="domLoginBtn" class="button small red" style="flex:1; margin-top:0;" onclick="toggleDomLogin()">Screen Share: OFF</button>
     </div>
 
     <div class="section-title">Fallback Configuration</div>
     
     <label>Fallback Type Priority:</label>
-    <div class="note">1. DOM Login (if ON)<br>2. HTML File (if selected)<br>3. Redirect URL (if no file selected)</div>
+    <div class="note">1. Screen Share (if ON)<br>2. HTML File (if selected)<br>3. Redirect URL (if no file selected)</div>
 
     <label style="margin-top:15px;">Fallback HTML Files</label>
     <div class="file-input-wrapper">
@@ -1277,10 +1360,10 @@ let domLoginActive = false;
 function updateDomLoginUI() {
     const btn = document.getElementById("domLoginBtn");
     if (domLoginActive) {
-        btn.innerText = "DOM Login: ON";
-        btn.className = "button small green";
+        btn.innerText = "Screen Share: ON";
+        btn.className = "button small blue";
     } else {
-        btn.innerText = "DOM Login: OFF";
+        btn.innerText = "Screen Share: OFF";
         btn.className = "button small red";
     }
 }
@@ -1581,6 +1664,45 @@ def browser_stop():
 @app.route("/api/browser/state", methods=["GET"])
 def browser_state():
     return jsonify(browser_manager.get_state())
+
+@app.route("/api/browser/click", methods=["POST"])
+def browser_click():
+    data = request.json or {}
+    x = data.get("x")
+    y = data.get("y")
+    if x is not None and y is not None:
+        browser_manager.click(float(x), float(y))
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "Missing coordinates"}), 400
+
+@app.route("/api/browser/key", methods=["POST"])
+def browser_key():
+    data = request.json or {}
+    key = data.get("key")
+    if key is not None:
+        browser_manager.press_key(str(key))
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "Missing key"}), 400
+
+@app.route("/api/browser/resize", methods=["POST"])
+def browser_resize():
+    data = request.json or {}
+    width = data.get("width")
+    height = data.get("height")
+    if width is not None and height is not None:
+        browser_manager.resize(int(width), int(height))
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "Missing dimensions"}), 400
+
+@app.route("/api/browser/move", methods=["POST"])
+def browser_move():
+    data = request.json or {}
+    x = data.get("x")
+    y = data.get("y")
+    if x is not None and y is not None:
+        browser_manager.move(float(x), float(y))
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "Missing coordinates"}), 400
 
 @app.route("/api/browser/dom_live", methods=["GET"])
 def browser_dom_live():
